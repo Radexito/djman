@@ -1,0 +1,31 @@
+{
+  "name": "dj_manager",
+  "version": "1.0.0",
+  "description": "This project aims to build a **DJ-focused music library manager** designed around real DJ workflows rather than consumer music players. The application prioritizes **efficient library management**, **playlist curation**, **USB export**, **advanced filtering**, and **future-ready audio analysis**, while remaining fast, portable, and fully offline.",
+  "main": "main.js",
+  "scripts": {
+    "react": "cd renderer && npm run dev",
+    "electron": "wait-on http://localhost:5173 && electron .",
+    "dev": "concurrently -k \"npm:react\" \"npm:electron\"",
+    "build-renderer": "cd renderer && npm run build",
+    "build": "npm run build-renderer",
+    "electron-prod": "NODE_ENV=production electron ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Radexito/djman.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Radexito/djman/issues"
+  },
+  "homepage": "https://github.com/Radexito/djman#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^40.0.0",
+    "wait-on": "^9.0.3"
+  }
+}
