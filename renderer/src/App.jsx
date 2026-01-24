@@ -1,35 +1,97 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [playlists, setPlaylists] = useState([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
+  const [tracks, setTracks] = useState([]);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [newTrackTitle, setNewTrackTitle] = useState('');
+
+  // Load playlists on mount
+  useEffect(() => {
+    // For now, just one playlist test
+    async function init() {
+      const playlistId = await window.api.createPlaylist('My First Playlist');
+      setPlaylists([{ id: playlistId, name: 'My First Playlist' }]);
+      setSelectedPlaylistId(playlistId);
+    }
+
+    init();
+  }, []);
+
+  // Load tracks whenever selected playlist changes
+  useEffect(() => {
+    async function loadTracks() {
+      if (!selectedPlaylistId) return;
+      const t = await window.api.getPlaylistTracks(selectedPlaylistId);
+      setTracks(t);
+    }
+
+    loadTracks();
+  }, [selectedPlaylistId]);
+
+  const handleAddTrack = async () => {
+  if (!newTrackTitle || !selectedPlaylistId) return;
+
+  try {
+    const trackId = await window.api.addTrack({
+      title: newTrackTitle,
+      artist: 'Unknown',
+      album: 'Unknown',
+      duration: 180,
+    });
+
+    await window.api.addTrackToPlaylist(selectedPlaylistId, trackId, tracks.length);
+    const t = await window.api.getPlaylistTracks(selectedPlaylistId);
+    setTracks(t);
+    setNewTrackTitle('');
+  } catch (err) {
+    console.error('Failed to add track:', err);
+    alert('Error adding track: see console');
+  }
+};
+
 
   return (
-    <>
+    <div className="App">
+      <h1>DJ Library MVP</h1>
+
       <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <h2>Playlists</h2>
+        <ul>
+          {playlists.map((p) => (
+            <li
+              key={p.id}
+              style={{ cursor: 'pointer', fontWeight: p.id === selectedPlaylistId ? 'bold' : 'normal' }}
+              onClick={() => setSelectedPlaylistId(p.id)}
+            >
+              {p.name}
+            </li>
+          ))}
+        </ul>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
+
+      <div>
+        <h2>Tracks</h2>
+        <ul>
+          {tracks.map((t, i) => (
+            <li key={t.id}>
+              {i + 1}. {t.title} — {t.artist} ({t.album})
+            </li>
+          ))}
+        </ul>
+
+        <input
+          type="text"
+          placeholder="New track title"
+          value={newTrackTitle}
+          onChange={(e) => setNewTrackTitle(e.target.value)}
+        />
+        <button onClick={handleAddTrack}>Add Track</button>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;
