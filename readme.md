@@ -22,7 +22,7 @@ Linux (Arch/Ubuntu):
 ```bash
 chmod +x scripts/install-ffmpeg.sh
 ./scripts/install-ffmpeg.sh
-
+```
 
 ---
 
@@ -36,6 +36,7 @@ chmod +x scripts/install-ffmpeg.sh
 * Make **USB export and portability** simple and reliable
 
 ---
+
 
 ## Core Architectural Decisions
 
