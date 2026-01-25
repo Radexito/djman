@@ -1,0 +1,134 @@
+.sidebar {
+    width: 220px;
+    background-color: #111111;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 12px;
+}
+
+.fixed-top-section {
+    flex-shrink: 0;
+    padding-bottom: 8px;
+}
+
+.scrollable-playlists {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+.fixed-bottom-section {
+    flex-shrink: 0;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #2a2a2a;
+}
+
+.menu-section {
+    margin-bottom: 12px;
+}
+
+.menu-section.scrollable .menu-item {
+    margin-bottom: 2px;
+}
+
+.menu-item {
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.menu-text {
+    margin-left: 8px;
+    flex: 1;
+}
+
+.menu-item:hover {
+    background-color: #2a2a2a;
+}
+
+.menu-item.active {
+    background-color: #333;
+}
+
+.menu-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+.section-title {
+    padding: 12px 12px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.menu-separator {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #333, transparent);
+    margin: 16px 0;
+}
+
+.import-progress {
+    margin-top: 12px;
+    padding: 8px 12px;
+    font-weight: 500;
+    background-color: #2a2a2a;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.import-button {
+    margin-top: 12px;
+    margin-bottom: 25px;
+    width: 100%;
+    padding: 10px;
+    background-color: #1db9542f;
+    border: 2px solid #1db954;
+    color: #ffffff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.import-button:active, .import-button:focus {
+    outline:none;
+}
+
+.import-button:hover {
+    background-color: #1db95455;
+    border-color: #10c44f;
+}
+
+/* Custom thin scrollbar */
+.scrollable-playlists::-webkit-scrollbar {
+    width: 4px;
+}
+
+.scrollable-playlists::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border-radius: 2px;
+}
+
+.scrollable-playlists::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 2px;
+}
+
+.scrollable-playlists::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

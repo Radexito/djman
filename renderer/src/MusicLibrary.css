@@ -1,0 +1,105 @@
+.music-library {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #1a1a1a;
+}
+
+/* Search */
+.search-input {
+  margin-bottom: 20px;
+  padding: 8px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background-color: #222;
+  color: #fff;
+  outline: none;
+}
+
+/* Header */
+.header {
+  display: grid;
+  grid-template-columns: 5% 30% 25% 8% 8% 8% 8% 8%;
+  padding: 12px 8px;
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  font-weight: 600;
+  border-bottom: 1px solid #404040;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-cell {
+  padding: 8px 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.header-cell.right {
+  text-align: right;
+}
+
+/* Rows */
+.row {
+  height: 50px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 5% 30% 25% 8% 8% 8% 8% 8%;
+  align-items: center;
+  padding: 0 8px;
+  cursor: pointer;
+  color: #e0e0e0;
+}
+
+.row-even {
+  background-color: #1a1a1a;
+}
+
+.row-odd {
+  background-color: #222222;
+}
+
+.row-loading {
+  color: #aaa;
+  background-color: #1a1a1a;
+}
+
+/* Cells */
+.cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell.index {
+  font-weight: 500;
+  color: #fff;
+}
+
+.cell.title {
+  color: #fff;
+}
+
+.cell.artist {
+  color: #e0e0e0;
+}
+
+.cell.numeric {
+  text-align: right;
+  color: #aaa;
+}
+
+.cell.status {
+  text-align: center;
+  font-size: 16px;
+  color: #4ade80;
+}
+
+/* react-window */
+.track-list {
+  flex: 1;
+  background-color: #1a1a1a;
+}
