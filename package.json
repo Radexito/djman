@@ -31,6 +31,8 @@
     "wait-on": "^9.0.3"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2"
+    "better-sqlite3": "^12.6.2",
+    "react-virtualized": "^9.22.6",
+    "react-window": "^2.2.5"
   }
 }

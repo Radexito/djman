@@ -3,21 +3,27 @@ import './App.css';
 import { FixedSizeList as List } from 'react-window';
 
 const PAGE_SIZE = 50;
-const ROW_HEIGHT = 60;
+const ROW_HEIGHT = 50;
 
 function App() {
   const [tracks, setTracks] = useState([]);
   const [search, setSearch] = useState('');
   const [hasMore, setHasMore] = useState(true);
   const [importProgress, setImportProgress] = useState({ total: 0, completed: 0 });
+  const [selectedPlaylist, setSelectedPlaylist] = useState('music');
+  const [sortBy, setSortBy] = useState({ key: 'index', asc: true });
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
   const listRef = useRef();
 
-  // -------------------------------
-  // Load tracks with paging
-  // -------------------------------
+  const playlists = [
+    { id: 'music', name: 'Music' },
+    { id: 'pl1', name: 'Playlist 1' },
+    { id: 'pl2', name: 'Playlist 2' },
+    { id: 'pl3', name: 'Playlist 3' },
+  ];
+
   const loadTracks = useCallback(async () => {
     if (loadingRef.current || !hasMore) return;
     loadingRef.current = true;
@@ -28,27 +34,23 @@ function App() {
       limit: PAGE_SIZE,
       offset,
       search,
+      playlistId: selectedPlaylist !== 'music' ? selectedPlaylist : undefined,
     });
 
     setTracks(prev => [...prev, ...rows]);
     offsetRef.current += rows.length;
 
     if (rows.length < PAGE_SIZE) setHasMore(false);
-
     loadingRef.current = false;
-  }, [search, hasMore]);
+  }, [search, hasMore, selectedPlaylist]);
 
   useEffect(() => {
-    // Reset only on new search
     offsetRef.current = 0;
     setTracks([]);
     setHasMore(true);
     loadTracks();
-  }, [search]);
+  }, [search, selectedPlaylist]);
 
-  // -------------------------------
-  // Import tracks with placeholders
-  // -------------------------------
   const handleImport = async () => {
     const files = await window.api.selectAudioFiles();
     if (!files.length) return;
@@ -70,7 +72,6 @@ function App() {
         analyzed: 0,
       };
 
-      // PREPEND placeholder **and keep scroll stable**
       if (listRef.current) {
         const scrollOffset = listRef.current.scrollOffset;
         setTracks(prev => [placeholder, ...prev]);
@@ -85,9 +86,6 @@ function App() {
     setImportProgress({ total: 0, completed: 0 });
   };
 
-  // -------------------------------
-  // Track updates from analysis worker
-  // -------------------------------
   useEffect(() => {
     const handler = ({ trackId, analysis }) => {
       setTracks(prev =>
@@ -98,76 +96,160 @@ function App() {
     return () => window.api.offTrackUpdated?.(handler);
   }, []);
 
-  // -------------------------------
-  // Row renderer
-  // -------------------------------
+  // Sorting
+  const handleSort = key => {
+    setSortBy(prev => ({
+      key,
+      asc: prev.key === key ? !prev.asc : true,
+    }));
+  };
+
+  const sortedTracks = [...tracks].sort((a, b) => {
+    if (sortBy.key === 'index') return 0;
+    const va = a[sortBy.key] ?? '';
+    const vb = b[sortBy.key] ?? '';
+    if (typeof va === 'string') return sortBy.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    if (typeof va === 'number') return sortBy.asc ? va - vb : vb - va;
+    return 0;
+  });
+
+  const columns = [
+    { key: 'index', label: '#' },
+    { key: 'title', label: 'Title', width: 250 },
+    { key: 'artist', label: 'Artist', width: 200 },
+    { key: 'bpm', label: 'BPM', width: 60 },
+    { key: 'key_camelot', label: 'Key', width: 60 },
+    { key: 'energy', label: 'Energy', width: 60 },
+    { key: 'loudness', label: 'Loudness', width: 80 },
+    { key: 'status', label: 'Status', width: 80 },
+  ];
+
   const Row = ({ index, style }) => {
-    const t = tracks[index];
+    const t = sortedTracks[index];
     if (!t) return null;
 
     return (
-      <div
-        style={{
-          ...style,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 12px',
-          borderBottom: '1px solid #333',
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          {index + 1}. {t.title} — {t.artist || 'Unknown'}
-          {t.bpm ? ` | ${t.bpm} BPM` : ' | BPM: ...'}
-          {t.key_camelot ? ` | Key: ${t.key_camelot}` : ' | Key: ...'}
-          {t.energy ? ` | Energy: ${t.energy}` : ' | Energy: ...'}
-          {t.loudness ? ` | LUFS: ${t.loudness}` : ' | LUFS: ...'}
-        </div>
-        {!t.analyzed && <div style={{ marginLeft: 10 }}>🔄 Analyzing...</div>}
-      </div>
+      <tr style={{ ...style, display: 'table', tableLayout: 'fixed', width: '100%' }}>
+        <td style={{ padding: '0 8px' }}>{index + 1}</td>
+        <td style={{ padding: '0 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.title}>{t.title}</td>
+        <td style={{ padding: '0 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.artist || 'Unknown'}>{t.artist || 'Unknown'}</td>
+        <td style={{ padding: '0 8px', textAlign: 'right' }}>{t.bpm ?? '...'}</td>
+        <td style={{ padding: '0 8px', textAlign: 'right' }}>{t.key_camelot ?? '...'}</td>
+        <td style={{ padding: '0 8px', textAlign: 'right' }}>{t.energy ?? '...'}</td>
+        <td style={{ padding: '0 8px', textAlign: 'right' }}>{t.loudness ?? '...'}</td>
+        <td style={{ padding: '0 8px', textAlign: 'center' }}>{t.analyzed ? '✅' : '🔄'}</td>
+      </tr>
     );
   };
 
-  // -------------------------------
-  // Infinite scroll using onItemsRendered
-  // -------------------------------
   const handleItemsRendered = ({ visibleStopIndex }) => {
     if (!hasMore || loadingRef.current) return;
-    if (visibleStopIndex >= tracks.length - 5) {
-      loadTracks();
-    }
+    if (visibleStopIndex >= sortedTracks.length - 5) loadTracks();
   };
 
   return (
-    <div className="App">
-      <h1>🎧 Music Library</h1>
-
-      <input
-        placeholder="Search title / artist / album"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ width: '60%', marginBottom: 12 }}
-      />
-
-      {importProgress.total > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          Importing {importProgress.completed} / {importProgress.total}...
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+      {/* Sidebar */}
+      <div style={{
+        width: 220,
+        backgroundColor: '#111',
+        color: '#fff',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: 12,
+        justifyContent: 'space-between',
+      }}>
+        <div>
+          <input
+            placeholder="Search title / artist / album"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', marginBottom: 20 }}
+          />
+          {playlists.map(pl => (
+            <div
+              key={pl.id}
+              style={{
+                padding: '8px 12px',
+                marginBottom: 4,
+                cursor: 'pointer',
+                backgroundColor: selectedPlaylist === pl.id ? '#333' : 'transparent',
+                borderRadius: 4
+              }}
+              onClick={() => setSelectedPlaylist(pl.id)}
+            >
+              {pl.name}
+            </div>
+          ))}
         </div>
-      )}
 
-      <List
-        ref={listRef}
-        height={600}
-        itemCount={tracks.length}
-        itemSize={ROW_HEIGHT}
-        width="100%"
-        onItemsRendered={handleItemsRendered}
-      >
-        {Row}
-      </List>
+        <button
+          onClick={handleImport}
+          style={{
+            marginTop: 12,
+            width: '100%',
+            padding: '10px 0',
+            borderRadius: 4,
+            backgroundColor: '#1db954',
+            color: '#fff',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          Import Audio Files
+        </button>
+      </div>
 
-      <button onClick={handleImport} style={{ marginTop: 12 }}>
-        Import Audio Files
-      </button>
+      {/* Main content */}
+      <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {importProgress.total > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            Importing {importProgress.completed} / {importProgress.total}...
+          </div>
+        )}
+
+        {/* Table headers */}
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {columns.map(col => (
+                <th
+                  key={col.key}
+                  style={{
+                    textAlign: ['bpm', 'key_camelot', 'energy', 'loudness'].includes(col.key) ? 'right' : 'left',
+                    padding: '0 8px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    width: col.width
+                  }}
+                  onClick={() => handleSort(col.key)}
+                  title={`Sort by ${col.label}`}
+                >
+                  {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        </table>
+
+        <List
+          ref={listRef}
+          height={600}
+          itemCount={sortedTracks.length}
+          itemSize={ROW_HEIGHT}
+          width="100%"
+          onItemsRendered={handleItemsRendered}
+          style={{ overflowX: 'hidden' }}
+        >
+          {({ index, style }) => (
+            <table style={{ width: '100%', borderCollapse: 'collapse', ...style }}>
+              <tbody>
+                <Row index={index} style={{}} />
+              </tbody>
+            </table>
+          )}
+        </List>
+      </div>
     </div>
   );
 }
