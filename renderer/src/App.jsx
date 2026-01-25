@@ -1,95 +1,114 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import './App.css';
 
+const PAGE_SIZE = 50;
+
 function App() {
-  const [playlists, setPlaylists] = useState([]);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
+  console.log('Rendering App component');
+
   const [tracks, setTracks] = useState([]);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [newTrackTitle, setNewTrackTitle] = useState('');
+  const [hasMoreUI, setHasMoreUI] = useState(true);
+  const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load playlists on mount
+  const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+
   useEffect(() => {
-    // For now, just one playlist test
-    async function init() {
-      const playlistId = await window.api.createPlaylist('My First Playlist');
-      setPlaylists([{ id: playlistId, name: 'My First Playlist' }]);
-      setSelectedPlaylistId(playlistId);
+    console.log('Search changed:', search);
+    resetAndLoad();
+  }, [search]);
+
+  async function resetAndLoad() {
+    console.log('Resetting and loading tracks');
+
+    offsetRef.current = 0;
+    loadingRef.current = false;
+    hasMoreRef.current = true;
+
+    setTracks([]);
+    setHasMoreUI(true);
+
+    await loadMore(true);
+  }
+
+  async function loadMore(reset = false) {
+    console.log('Loading more tracks, reset:', reset);
+
+    if (loadingRef.current || !hasMoreRef.current) {
+      console.log('Blocked loadMore');
+      return;
     }
 
-    init();
-  }, []);
+    loadingRef.current = true;
+    setIsLoading(true);
 
-  // Load tracks whenever selected playlist changes
-  useEffect(() => {
-    async function loadTracks() {
-      if (!selectedPlaylistId) return;
-      const t = await window.api.getPlaylistTracks(selectedPlaylistId);
-      setTracks(t);
-    }
+    const offset = reset ? 0 : offsetRef.current;
 
-    loadTracks();
-  }, [selectedPlaylistId]);
-
-  const handleAddTrack = async () => {
-  if (!newTrackTitle || !selectedPlaylistId) return;
-
-  try {
-    const trackId = await window.api.addTrack({
-      title: newTrackTitle,
-      artist: 'Unknown',
-      album: 'Unknown',
-      duration: 180,
+    const rows = await window.api.getTracks({
+      limit: PAGE_SIZE,
+      offset,
+      search,
     });
 
-    await window.api.addTrackToPlaylist(selectedPlaylistId, trackId, tracks.length);
-    const t = await window.api.getPlaylistTracks(selectedPlaylistId);
-    setTracks(t);
-    setNewTrackTitle('');
-  } catch (err) {
-    console.error('Failed to add track:', err);
-    alert('Error adding track: see console');
-  }
-};
+    setTracks(prev => (reset ? rows : [...prev, ...rows]));
 
+    offsetRef.current = offset + rows.length;
+
+    if (rows.length < PAGE_SIZE) {
+      hasMoreRef.current = false;
+      setHasMoreUI(false);
+    }
+
+    loadingRef.current = false;
+    setIsLoading(false);
+  }
+
+  const handleImport = async () => {
+    console.log('Import button clicked');
+
+    const files = await window.api.selectAudioFiles();
+    if (!files.length) return;
+
+    await window.api.importAudioFiles(files);
+    await resetAndLoad();
+  };
 
   return (
     <div className="App">
-      <h1>DJ Library MVP</h1>
+      <h1>🎧 Music</h1>
 
-      <div>
-        <h2>Playlists</h2>
-        <ul>
-          {playlists.map((p) => (
-            <li
-              key={p.id}
-              style={{ cursor: 'pointer', fontWeight: p.id === selectedPlaylistId ? 'bold' : 'normal' }}
-              onClick={() => setSelectedPlaylistId(p.id)}
-            >
-              {p.name}
-            </li>
-          ))}
-        </ul>
-      </div>
+      <input
+        placeholder="Search title / artist / album"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        style={{ width: '60%', marginBottom: 12 }}
+      />
 
-      <div>
-        <h2>Tracks</h2>
-        <ul>
-          {tracks.map((t, i) => (
-            <li key={t.id}>
-              {i + 1}. {t.title} — {t.artist} ({t.album})
-            </li>
-          ))}
-        </ul>
+      <ul
+        style={{ maxHeight: '60vh', overflowY: 'auto' }}
+        onScroll={e => {
+          const el = e.target;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+            loadMore();
+          }
+        }}
+      >
+        {tracks.map((t, i) => (
+          <li key={t.id}>
+            {i + 1}. {t.title} — {t.artist || 'Unknown'}
+            {t.bpm ? ` | ${t.bpm} BPM` : ' | BPM: ...'}
+            {t.key_camelot ? ` | ${t.key_camelot}` : ' | Key: ...'}
+            {t.energy ? ` | Energy: ${t.energy}` : ' | Energy: ...'}
+            {t.loudness ? ` | LUFS: ${t.loudness}` : ' | LUFS: ...'}
+          </li>
+        ))}
+      </ul>
 
-        <input
-          type="text"
-          placeholder="New track title"
-          value={newTrackTitle}
-          onChange={(e) => setNewTrackTitle(e.target.value)}
-        />
-        <button onClick={handleAddTrack}>Add Track</button>
-      </div>
+      {isLoading && <p>Loading…</p>}
+
+      <button onClick={handleImport}>Import Audio Files</button>
     </div>
   );
 }

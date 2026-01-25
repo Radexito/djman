@@ -15,6 +15,17 @@ The app will be cross-platform, dark-themed, and capable of handling **very larg
 
 ---
 
+# Installing FFmpeg for DJ Manager
+
+Linux (Arch/Ubuntu):
+
+```bash
+chmod +x scripts/install-ffmpeg.sh
+./scripts/install-ffmpeg.sh
+
+
+---
+
 ## Main Goals
 
 * Provide a **robust, offline DJ music library manager**
