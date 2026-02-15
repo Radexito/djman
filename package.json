@@ -32,7 +32,10 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",
+    "music-metadata": "^11.12.0",
+    "music-tempo": "^1.0.3",
     "react-virtualized": "^9.22.6",
-    "react-window": "^2.2.5"
+    "react-window": "^2.2.5",
+    "web-audio-beat-detector": "^8.2.35"
   }
 }
