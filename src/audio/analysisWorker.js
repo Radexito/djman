@@ -97,7 +97,7 @@ async function analyzeAudio(filePath) {
     if (tags.bpm) {
       bpm = Math.round(tags.bpm);
       console.log(`[Worker] BPM found in tags: ${bpm}`);
-    } else if (tags.comment && tags.comment.some(c => c.includes('BPM'))) {
+    } else if (tags.comment && Array.isArray(tags.comment) && tags.comment.some(c => c.includes('BPM'))) {
       // Some software stores BPM in comments
       const commentWithBpm = tags.comment.find(c => c.includes('BPM'));
       const bpmMatch = commentWithBpm.match(/(\d+)\s*BPM/i);
