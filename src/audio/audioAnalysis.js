@@ -1,16 +1,14 @@
 /**
  * Audio Analysis Module (Testable)
  * 
- * This module extracts the core analysis logic from analysisWorker.js
- * to make it testable without Worker threads.
- * 
- * NOTE: BPM extraction is currently metadata-based (reads from ID3 tags).
- * Real-time BPM detection from audio signal would require additional
- * DSP/ML libraries like Essentia.js or aubio.
+ * This module performs real audio signal analysis using essentia.js
+ * Detects BPM, musical key, and energy from the actual audio waveform
  */
 
 import { parseFile } from 'music-metadata';
 import { toCamelot } from './keyUtils.js';
+import { decodeAudioFile } from './audioDecoder.js';
+import { analyzeAudioSignal } from './essentiaAnalysis.js';
 
 /**
  * Calculate energy from audio properties (0-10 scale)
@@ -97,102 +95,140 @@ export function parseKeyToCamelot(keyString) {
 
 /**
  * Main audio analysis function
- * Extracts BPM, key, energy, and loudness from audio file
+ * Performs real audio signal analysis to detect BPM, key, energy, and loudness
  * 
- * NOTE: BPM is extracted from file metadata (ID3 tags), not from audio signal analysis.
- * This is the standard approach used by DJ software like Serato, Rekordbox, and Traktor.
- * For files without embedded BPM metadata, this function returns null.
+ * This function uses essentia.js to analyze the actual audio waveform:
+ * - BPM detection via beat tracking algorithms
+ * - Key detection via pitch analysis
+ * - Energy calculation from RMS and dynamic range
+ * - Loudness estimation (LUFS)
  * 
- * Real-time BPM detection from audio signal would require:
- * - FFT analysis of the audio waveform
- * - Beat detection algorithms
- * - ML-based tempo estimation
- * - Libraries like Essentia.js, aubio, or BPM detection APIs
+ * Falls back to metadata extraction if signal analysis fails.
  */
 export async function analyzeAudio(filePath) {
   try {
-    // Parse metadata using music-metadata library
-    const metadata = await parseFile(filePath, { duration: true });
-    const tags = metadata.common;
-    const native = metadata.native || {};
+    // First, try real audio signal analysis
+    let analysisResults = {
+      bpm: null,
+      key_raw: null,
+      key_camelot: null,
+      energy: 5,
+      loudness: -12
+    };
     
-    // Extract BPM from tags (most DJ software embeds this)
-    // Supports multiple tag formats: TBPM, comment field, etc.
-    let bpm = null;
-    if (tags.bpm) {
-      bpm = Math.round(tags.bpm);
-    } else if (tags.comment && Array.isArray(tags.comment) && tags.comment.some(c => c.includes('BPM'))) {
-      // Some software stores BPM in comments
-      const commentWithBpm = tags.comment.find(c => c.includes('BPM'));
-      const bpmMatch = commentWithBpm.match(/BPM\s*(\d+)/i) || commentWithBpm.match(/(\d+)\s*BPM/i);
-      if (bpmMatch) {
-        bpm = parseInt(bpmMatch[1]);
+    try {
+      // Decode audio file to PCM data
+      const { audioData, sampleRate, duration } = await decodeAudioFile(filePath);
+      
+      // Perform audio signal analysis with essentia.js
+      const signalAnalysis = await analyzeAudioSignal(audioData, sampleRate);
+      
+      // Use detected BPM
+      if (signalAnalysis.bpm) {
+        analysisResults.bpm = signalAnalysis.bpm;
       }
-    } else if (typeof tags.comment === 'string' && tags.comment.includes('BPM')) {
-      // Handle single comment string
-      const bpmMatch = tags.comment.match(/BPM\s*(\d+)/i) || tags.comment.match(/(\d+)\s*BPM/i);
-      if (bpmMatch) {
-        bpm = parseInt(bpmMatch[1]);
+      
+      // Use detected key and convert to Camelot
+      if (signalAnalysis.key && signalAnalysis.scale) {
+        // Convert essentia key format to standard format
+        // Essentia returns key as 'A', 'A#', etc. and scale as 'major' or 'minor'
+        const keyNote = signalAnalysis.key;
+        const scale = signalAnalysis.scale;
+        
+        // Format key for Camelot conversion
+        if (scale === 'minor') {
+          analysisResults.key_raw = keyNote + 'm';
+        } else {
+          analysisResults.key_raw = keyNote;
+        }
+        
+        analysisResults.key_camelot = toCamelot(keyNote, scale);
       }
-    }
-    
-    // Also check native ID3 tags for comment field
-    if (!bpm) {
-      // Check all native tag formats
-      for (const format in native) {
-        if (!native[format]) continue;
-        const commentTag = native[format].find(t => 
-          t.id === 'TXXX:comment' || t.id === 'COMM' || t.id === 'comment'
-        );
-        if (commentTag && typeof commentTag.value === 'string') {
-          const bpmMatch = commentTag.value.match(/BPM\s*(\d+)/i) || commentTag.value.match(/(\d+)\s*BPM/i);
-          if (bpmMatch) {
-            bpm = parseInt(bpmMatch[1]);
+      
+      // Use calculated energy and loudness
+      analysisResults.energy = signalAnalysis.energy;
+      analysisResults.loudness = signalAnalysis.loudness;
+      
+    } catch (signalError) {
+      console.warn('[Analysis] Signal analysis failed, falling back to metadata:', signalError.message);
+      
+      // Fallback: Try to extract from metadata
+      const metadata = await parseFile(filePath, { duration: true });
+      const tags = metadata.common;
+      const native = metadata.native || {};
+      
+      // Extract BPM from metadata tags
+      let bpm = null;
+      if (tags.bpm) {
+        bpm = Math.round(tags.bpm);
+      } else if (tags.comment && Array.isArray(tags.comment) && tags.comment.some(c => c.includes('BPM'))) {
+        const commentWithBpm = tags.comment.find(c => c.includes('BPM'));
+        const bpmMatch = commentWithBpm.match(/BPM\s*(\d+)/i) || commentWithBpm.match(/(\d+)\s*BPM/i);
+        if (bpmMatch) {
+          bpm = parseInt(bpmMatch[1]);
+        }
+      } else if (typeof tags.comment === 'string' && tags.comment.includes('BPM')) {
+        const bpmMatch = tags.comment.match(/BPM\s*(\d+)/i) || tags.comment.match(/(\d+)\s*BPM/i);
+        if (bpmMatch) {
+          bpm = parseInt(bpmMatch[1]);
+        }
+      }
+      
+      // Check native ID3 tags
+      if (!bpm) {
+        for (const format in native) {
+          if (!native[format]) continue;
+          const commentTag = native[format].find(t => 
+            t.id === 'TXXX:comment' || t.id === 'COMM' || t.id === 'comment'
+          );
+          if (commentTag && typeof commentTag.value === 'string') {
+            const bpmMatch = commentTag.value.match(/BPM\s*(\d+)/i) || commentTag.value.match(/(\d+)\s*BPM/i);
+            if (bpmMatch) {
+              bpm = parseInt(bpmMatch[1]);
+              break;
+            }
+          }
+        }
+      }
+      
+      // Extract key from metadata tags
+      let keyRaw = null;
+      let keyCamelot = null;
+      if (tags.key) {
+        keyRaw = tags.key;
+        keyCamelot = parseKeyToCamelot(keyRaw);
+      } else if (tags.initialKey) {
+        keyRaw = tags.initialKey;
+        keyCamelot = parseKeyToCamelot(keyRaw);
+      }
+      
+      // Check native ID3 tags for key
+      if (!keyRaw) {
+        for (const format in native) {
+          if (!native[format]) continue;
+          const keyTag = native[format].find(t => 
+            t.id === 'TXXX:key' || t.id === 'TKEY' || t.id === 'key'
+          );
+          if (keyTag && keyTag.value) {
+            keyRaw = keyTag.value;
+            keyCamelot = parseKeyToCamelot(keyRaw);
             break;
           }
         }
       }
+      
+      // Use metadata-based estimates for energy/loudness
+      const energy = calculateEnergy(metadata);
+      const loudness = calculateLoudness(metadata);
+      
+      analysisResults.bpm = bpm;
+      analysisResults.key_raw = keyRaw;
+      analysisResults.key_camelot = keyCamelot;
+      analysisResults.energy = energy;
+      analysisResults.loudness = loudness;
     }
     
-    // Extract key from tags
-    let keyRaw = null;
-    let keyCamelot = null;
-    if (tags.key) {
-      keyRaw = tags.key;
-      keyCamelot = parseKeyToCamelot(keyRaw);
-    } else if (tags.initialKey) {
-      // ID3v2.3 TKEY frame
-      keyRaw = tags.initialKey;
-      keyCamelot = parseKeyToCamelot(keyRaw);
-    }
-    
-    // Also check native ID3 tags for key field
-    if (!keyRaw) {
-      // Check all native tag formats
-      for (const format in native) {
-        if (!native[format]) continue;
-        const keyTag = native[format].find(t => 
-          t.id === 'TXXX:key' || t.id === 'TKEY' || t.id === 'key'
-        );
-        if (keyTag && keyTag.value) {
-          keyRaw = keyTag.value;
-          keyCamelot = parseKeyToCamelot(keyRaw);
-          break;
-        }
-      }
-    }
-    
-    // Calculate energy and loudness from format properties
-    const energy = calculateEnergy(metadata);
-    const loudness = calculateLoudness(metadata);
-    
-    return {
-      bpm: bpm,
-      key_raw: keyRaw,
-      key_camelot: keyCamelot,
-      energy: energy,
-      loudness: loudness,
-    };
+    return analysisResults;
     
   } catch (err) {
     console.error('[Analysis] Error:', err);
