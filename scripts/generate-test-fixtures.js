@@ -161,24 +161,39 @@ function generateFixtures() {
 
 /**
  * Helper to get Camelot key notation
+ * Uses the same mapping as keyUtils.js for consistency
  */
 function getCamelotKey(key, mode) {
+  // Map of note to Camelot number (for major keys ending in B)
   const camelotMap = {
-    'C': '8B', 'Am': '8A',
-    'G': '9B', 'Em': '9A',
-    'D': '10B', 'Bm': '10A',
-    'A': '11B', 'F#m': '11A',
-    'E': '12B', 'C#m': '12A',
-    'B': '1B', 'G#m': '1A',
-    'F#': '2B', 'D#m': '2A',
-    'Db': '3B', 'Bbm': '3A',
-    'Ab': '4B', 'Fm': '4A',
-    'Eb': '5B', 'Cm': '5A',
-    'Bb': '6B', 'Gm': '6A',
-    'F': '7B', 'Dm': '7A'
+    'C': '8',
+    'G': '9',
+    'D': '10',
+    'A': '11',
+    'E': '12',
+    'B': '1',
+    'F#': '2', 'Gb': '2',
+    'Db': '3', 'C#': '3',
+    'Ab': '4', 'G#': '4',
+    'Eb': '5', 'D#': '5',
+    'Bb': '6', 'A#': '6',
+    'F': '7'
   };
   
-  return camelotMap[key] || null;
+  // For keys like "Am" or "Dm", extract the note
+  let note = key;
+  let keyMode = mode;
+  
+  if (key.endsWith('m')) {
+    note = key.slice(0, -1);
+    keyMode = 'minor';
+  }
+  
+  const camelotNumber = camelotMap[note];
+  if (!camelotNumber) return null;
+  
+  // Major keys end with B, minor keys end with A
+  return `${camelotNumber}${keyMode === 'minor' ? 'A' : 'B'}`;
 }
 
 // Run the generator
