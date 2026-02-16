@@ -149,6 +149,90 @@ export async function analyzeAudio(filePath) {
       analysisResults.energy = signalAnalysis.energy;
       analysisResults.loudness = signalAnalysis.loudness;
       
+      // If signal analysis didn't detect BPM or key, try metadata as fallback
+      // Also check metadata first for key, as signal analysis may be unreliable for simple audio
+      if (!analysisResults.bpm || !analysisResults.key_raw) {
+        try {
+          const metadata = await parseFile(filePath, { duration: true });
+          const tags = metadata.common;
+          const native = metadata.native || {};
+          
+          // Extract key from metadata first (more reliable for simple/synthetic audio)
+          let keyRaw = null;
+          let keyCamelot = null;
+          if (tags.key) {
+            keyRaw = tags.key;
+            keyCamelot = parseKeyToCamelot(keyRaw);
+          } else if (tags.initialKey) {
+            keyRaw = tags.initialKey;
+            keyCamelot = parseKeyToCamelot(keyRaw);
+          }
+          
+          // Check native ID3 tags for key
+          if (!keyRaw) {
+            for (const format in native) {
+              if (!native[format]) continue;
+              const keyTag = native[format].find(t => 
+                t.id === 'TXXX:key' || t.id === 'TKEY' || t.id === 'key'
+              );
+              if (keyTag && keyTag.value) {
+                keyRaw = keyTag.value;
+                keyCamelot = parseKeyToCamelot(keyRaw);
+                break;
+              }
+            }
+          }
+          
+          // Prefer metadata key over signal analysis for simple audio
+          if (keyRaw) {
+            analysisResults.key_raw = keyRaw;
+            analysisResults.key_camelot = keyCamelot;
+          }
+          
+          // Try to extract BPM from metadata if not detected from signal
+          if (!analysisResults.bpm) {
+            let bpm = null;
+            if (tags.bpm) {
+              bpm = Math.round(tags.bpm);
+            } else if (tags.comment && Array.isArray(tags.comment) && tags.comment.some(c => c.includes('BPM'))) {
+              const commentWithBpm = tags.comment.find(c => c.includes('BPM'));
+              const bpmMatch = commentWithBpm.match(/BPM\s*(\d+)/i) || commentWithBpm.match(/(\d+)\s*BPM/i);
+              if (bpmMatch) {
+                bpm = parseInt(bpmMatch[1]);
+              }
+            } else if (typeof tags.comment === 'string' && tags.comment.includes('BPM')) {
+              const bpmMatch = tags.comment.match(/BPM\s*(\d+)/i) || tags.comment.match(/(\d+)\s*BPM/i);
+              if (bpmMatch) {
+                bpm = parseInt(bpmMatch[1]);
+              }
+            }
+            
+            // Check native ID3 tags
+            if (!bpm) {
+              for (const format in native) {
+                if (!native[format]) continue;
+                const commentTag = native[format].find(t => 
+                  t.id === 'TXXX:comment' || t.id === 'COMM' || t.id === 'comment'
+                );
+                if (commentTag && typeof commentTag.value === 'string') {
+                  const bpmMatch = commentTag.value.match(/BPM\s*(\d+)/i) || commentTag.value.match(/(\d+)\s*BPM/i);
+                  if (bpmMatch) {
+                    bpm = parseInt(bpmMatch[1]);
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (bpm) {
+              analysisResults.bpm = bpm;
+            }
+          }
+        } catch (metadataError) {
+          console.warn('[Analysis] Metadata fallback also failed:', metadataError.message);
+        }
+      }
+      
     } catch (signalError) {
       console.warn('[Analysis] Signal analysis failed, falling back to metadata:', signalError.message);
       
