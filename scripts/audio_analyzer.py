@@ -83,10 +83,14 @@ def analyze_audio(file_path):
         # ReplayGain targets -18 dBFS reference level, while EBU R128 LUFS targets -23 LUFS
         # The relationship is: LUFS = -18 - ReplayGain
         # 
+        # Note: This is an approximation. True LUFS (EBU R128) uses different weighting filters
+        # and has a systematic offset of ~5 dB from this calculation. For accurate LUFS,
+        # proper EBU R128 analysis would be required with stereo audio support.
+        # 
         # Example: If ReplayGain = +3 dB (audio is quiet, needs boost)
-        #          then LUFS = -18 - 3 = -21 LUFS (quieter than reference)
+        #          then LUFS ≈ -18 - 3 = -21 LUFS (quieter than reference)
         # Example: If ReplayGain = -6 dB (audio is loud, needs attenuation)
-        #          then LUFS = -18 - (-6) = -12 LUFS (louder than reference)
+        #          then LUFS ≈ -18 - (-6) = -12 LUFS (louder than reference)
         replay_gain = es.ReplayGain()
         gain = replay_gain(audio)
         lufs = -18.0 - gain

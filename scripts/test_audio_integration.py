@@ -35,6 +35,17 @@ def create_test_audio_file(filename='/tmp/test_track.mp3', bpm=120):
         import essentia.standard as es
         import numpy as np
         
+        # Audio synthesis parameters for test file
+        # Standard tuning reference - used for key detection
+        BASE_TONE_FREQUENCY_HZ = 440.0  # A440 - concert pitch
+        
+        # Kick drum synthesis parameters
+        # 60 Hz is in the sub-bass range, typical for electronic kick drums
+        KICK_FREQUENCY_HZ = 60.0
+        # Decay rate of 20 gives natural ~50ms kick duration (1/20 ≈ 0.05s)
+        KICK_DECAY_RATE = 20.0
+        KICK_DURATION_SEC = 0.1
+        
         # Create a simple test audio with a clear tempo
         sample_rate = 44100
         duration = 10.0  # 10 seconds
@@ -48,7 +59,7 @@ def create_test_audio_file(filename='/tmp/test_track.mp3', bpm=120):
         
         # Create a base tone at A (440 Hz)
         # Using A440 as it's the standard tuning reference, so key detection should identify this as key of A
-        audio = 0.1 * np.sin(2 * np.pi * 440.0 * t)
+        audio = 0.1 * np.sin(2 * np.pi * BASE_TONE_FREQUENCY_HZ * t)
         
         # Add periodic kicks to establish tempo
         beat_times = np.arange(0, duration, beat_interval)
@@ -56,12 +67,11 @@ def create_test_audio_file(filename='/tmp/test_track.mp3', bpm=120):
             # Create a kick drum sound (low frequency burst)
             # Using 60 Hz (bass frequency) with exponential decay to simulate a kick drum
             # The decay rate of 20 gives a natural-sounding kick with ~50ms effective duration
-            kick_duration = 0.1  # 100ms kick
             kick_start = int(beat_time * sample_rate)
-            kick_end = min(kick_start + int(kick_duration * sample_rate), len(audio))
+            kick_end = min(kick_start + int(KICK_DURATION_SEC * sample_rate), len(audio))
             
-            kick_t = np.linspace(0, kick_duration, kick_end - kick_start)
-            kick = 0.8 * np.sin(2 * np.pi * 60 * kick_t) * np.exp(-kick_t * 20)
+            kick_t = np.linspace(0, KICK_DURATION_SEC, kick_end - kick_start)
+            kick = 0.8 * np.sin(2 * np.pi * KICK_FREQUENCY_HZ * kick_t) * np.exp(-kick_t * KICK_DECAY_RATE)
             audio[kick_start:kick_end] += kick
         
         # Normalize

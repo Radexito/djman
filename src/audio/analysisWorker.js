@@ -62,15 +62,21 @@ function analyzeAudio(filePath) {
         
         // Calculate energy from BPM and key strength (0-10 scale)
         // Higher BPM and stronger key detection = higher energy
-        const bpmEnergy = Math.min((result.bpm - 60) / 20, 10);
-        const keyEnergy = result.key_strength * 10;
+        
+        // Energy calculation parameters
+        const MIN_BPM = 60;           // Minimum BPM for energy calculation baseline
+        const BPM_ENERGY_SCALE = 20;  // BPM range per energy point (60-80=1, 80-100=2, etc.)
+        const MAX_ENERGY = 10;        // Maximum energy value on 0-10 scale
+        
+        const bpmEnergy = Math.min((result.bpm - MIN_BPM) / BPM_ENERGY_SCALE, MAX_ENERGY);
+        const keyEnergy = result.key_strength * MAX_ENERGY;
         const energy = Math.round((bpmEnergy + keyEnergy) / 2);
         
         resolve({
           bpm: result.bpm,
           key_raw: result.key_raw,
           key_camelot: result.key_camelot,
-          energy: Math.max(1, Math.min(10, energy)),
+          energy: Math.max(1, Math.min(MAX_ENERGY, energy)),
           loudness: result.loudness
         });
         
