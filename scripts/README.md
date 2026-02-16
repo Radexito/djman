@@ -26,7 +26,6 @@ pip3 install -r scripts/requirements.txt
 This will install:
 - `essentia`: Audio analysis library
 - `numpy`: Numerical computing
-- `pyloudnorm`: Loudness normalization
 
 ## Usage
 
