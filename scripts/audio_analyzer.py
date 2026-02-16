@@ -6,7 +6,6 @@ Extracts BPM, musical key, and LUFS loudness from audio files
 
 import sys
 import json
-import essentia
 import essentia.standard as es
 import numpy as np
 

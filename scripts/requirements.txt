@@ -1,3 +1,2 @@
 essentia
 numpy
-pyloudnorm
