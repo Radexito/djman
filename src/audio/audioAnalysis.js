@@ -3,6 +3,10 @@
  * 
  * This module extracts the core analysis logic from analysisWorker.js
  * to make it testable without Worker threads.
+ * 
+ * NOTE: BPM extraction is currently metadata-based (reads from ID3 tags).
+ * Real-time BPM detection from audio signal would require additional
+ * DSP/ML libraries like Essentia.js or aubio.
  */
 
 import { parseFile } from 'music-metadata';
@@ -94,6 +98,16 @@ export function parseKeyToCamelot(keyString) {
 /**
  * Main audio analysis function
  * Extracts BPM, key, energy, and loudness from audio file
+ * 
+ * NOTE: BPM is extracted from file metadata (ID3 tags), not from audio signal analysis.
+ * This is the standard approach used by DJ software like Serato, Rekordbox, and Traktor.
+ * For files without embedded BPM metadata, this function returns null.
+ * 
+ * Real-time BPM detection from audio signal would require:
+ * - FFT analysis of the audio waveform
+ * - Beat detection algorithms
+ * - ML-based tempo estimation
+ * - Libraries like Essentia.js, aubio, or BPM detection APIs
  */
 export async function analyzeAudio(filePath) {
   try {
@@ -103,6 +117,7 @@ export async function analyzeAudio(filePath) {
     const native = metadata.native || {};
     
     // Extract BPM from tags (most DJ software embeds this)
+    // Supports multiple tag formats: TBPM, comment field, etc.
     let bpm = null;
     if (tags.bpm) {
       bpm = Math.round(tags.bpm);

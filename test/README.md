@@ -82,11 +82,23 @@ npm run test:coverage
 
 Tests the main audio analysis logic:
 - **BPM Extraction**: Validates BPM is correctly extracted from ID3 tags and comments
+  - Note: Tests metadata-based extraction, not real-time audio signal analysis
+  - BPM is read from file tags (TBPM frame or comment field)
+  - Returns null for files without BPM metadata
 - **Key Extraction**: Tests key extraction from multiple tag formats
 - **Camelot Conversion**: Verifies musical keys are correctly converted to Camelot notation
 - **Energy Calculation**: Tests energy estimation based on format properties
 - **Loudness Calculation**: Validates LUFS approximation
 - **Edge Cases**: Tests handling of invalid inputs and missing data
+
+#### BPM Extraction Limitations
+
+The current implementation extracts BPM from file metadata (ID3 tags), which is the standard approach used by professional DJ software. Real-time BPM detection from audio signal would require:
+- FFT analysis of audio waveform
+- Beat detection algorithms
+- ML-based tempo estimation libraries (Essentia.js, aubio, etc.)
+
+This is a planned future enhancement but not implemented in the current version.
 
 ### keyUtils.test.js
 
