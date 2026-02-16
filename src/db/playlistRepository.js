@@ -1,6 +1,11 @@
 // src/db/playlistRepository.js
 import db from './database.js';
 
+// Get all playlists
+export function getAllPlaylists() {
+  return db.prepare(`SELECT * FROM playlists ORDER BY name`).all();
+}
+
 // Create a new playlist
 export function createPlaylist(name) {
   const stmt = db.prepare(`INSERT INTO playlists (name) VALUES (?)`);

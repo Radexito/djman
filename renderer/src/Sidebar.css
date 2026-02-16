@@ -73,6 +73,109 @@
     color: #888;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.add-playlist-btn {
+    background: none;
+    border: 1px solid #555;
+    color: #888;
+    border-radius: 3px;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.add-playlist-btn:hover {
+    background-color: #2a2a2a;
+    color: #1db954;
+    border-color: #1db954;
+}
+
+.create-playlist-form {
+    padding: 8px 12px;
+    background-color: #1a1a1a;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.create-playlist-form input {
+    width: 100%;
+    padding: 6px 8px;
+    background-color: #222;
+    border: 1px solid #444;
+    color: #fff;
+    border-radius: 3px;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.create-playlist-form input:focus {
+    outline: none;
+    border-color: #1db954;
+}
+
+.form-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.form-buttons button {
+    flex: 1;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.form-buttons button:first-child {
+    background-color: #1db954;
+    color: #fff;
+}
+
+.form-buttons button:first-child:hover {
+    background-color: #1ed760;
+}
+
+.form-buttons button:last-child {
+    background-color: #444;
+    color: #fff;
+}
+
+.form-buttons button:last-child:hover {
+    background-color: #555;
+}
+
+.delete-playlist-btn {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    margin-left: auto;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.menu-item:hover .delete-playlist-btn {
+    opacity: 1;
+}
+
+.delete-playlist-btn:hover {
+    color: #ff4444;
 }
 
 .menu-separator {

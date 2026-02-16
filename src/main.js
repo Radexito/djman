@@ -2,8 +2,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { initDB } from './db/migrations.js';
-// import { createPlaylist, addTrackToPlaylist, getPlaylistTracks } from './db/playlistRepository.js';
-import { addTrack, getTracks } from './db/trackRepository.js';
+import db from './db/database.js';
+import { 
+  createPlaylist, 
+  deletePlaylist, 
+  getPlaylist,
+  getAllPlaylists,
+  addTrackToPlaylist, 
+  getPlaylistTracks,
+  removeTrackFromPlaylist,
+  updateTrackOrder 
+} from './db/playlistRepository.js';
+import { addTrack, getTracks, updateTrack, deleteTrack } from './db/trackRepository.js';
 import { importAudioFile } from './audio/importManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,13 +55,46 @@ async function initApp() {
 }
 
 // IPC Handlers
+
+// Track operations
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
-// ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
 ipcMain.handle('add-track', (event, track) => addTrack(track));
-// ipcMain.handle('add-track-to-playlist', (event, playlistId, trackId, order) =>
-//   addTrackToPlaylist(playlistId, trackId, order)
-// );
-// ipcMain.handle('get-playlist-tracks', (event, playlistId) => getPlaylistTracks(playlistId));
+ipcMain.handle('update-track', (event, id, data) => {
+  updateTrack(id, data);
+  return true;
+});
+ipcMain.handle('delete-track', async (event, id) => {
+  try {
+    await deleteTrack(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Playlist operations
+ipcMain.handle('get-playlists', async () => {
+  return getAllPlaylists();
+});
+ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
+ipcMain.handle('delete-playlist', (event, id) => {
+  deletePlaylist(id);
+  return true;
+});
+ipcMain.handle('add-track-to-playlist', (event, playlistId, trackId, order) =>
+  addTrackToPlaylist(playlistId, trackId, order)
+);
+ipcMain.handle('get-playlist-tracks', (event, playlistId) => getPlaylistTracks(playlistId));
+ipcMain.handle('remove-track-from-playlist', (event, playlistId, trackId) => {
+  removeTrackFromPlaylist(playlistId, trackId);
+  return true;
+});
+ipcMain.handle('update-track-order', (event, playlistId, trackId, newOrder) => {
+  updateTrackOrder(playlistId, trackId, newOrder);
+  return true;
+});
+
+// File operations
 ipcMain.handle('select-audio-files', async () => {
   console.log('Selecting audio files');
   const result = await dialog.showOpenDialog({

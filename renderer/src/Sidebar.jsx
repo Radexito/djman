@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './Sidebar.css';
 
 const musicItems = [
@@ -7,13 +7,25 @@ const musicItems = [
   { id: 'download', name: 'Download', icon: '🔍' },
 ];
 
-const playlistItems = Array.from({ length: 45 }, (_, i) => ({
-  id: `pl${i + 1}`,
-  name: `Playlist ${i + 1}`,
-}));
-
 function Sidebar({ selectedMenuItemId, onMenuSelect }) {
   const [importProgress, setImportProgress] = useState({ total: 0, completed: 0 });
+  const [playlists, setPlaylists] = useState([]);
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+
+  // Load playlists on mount
+  useEffect(() => {
+    loadPlaylists();
+  }, []);
+
+  const loadPlaylists = async () => {
+    try {
+      const loadedPlaylists = await window.api.getPlaylists();
+      setPlaylists(loadedPlaylists);
+    } catch (error) {
+      console.error('Failed to load playlists:', error);
+    }
+  };
 
   const handleImport = async () => {
     const files = await window.api.selectAudioFiles();
@@ -29,6 +41,39 @@ function Sidebar({ selectedMenuItemId, onMenuSelect }) {
     }
 
     setImportProgress({ total: 0, completed: 0 });
+  };
+
+  const handleCreatePlaylist = async () => {
+    if (!newPlaylistName.trim()) return;
+    
+    try {
+      await window.api.createPlaylist(newPlaylistName.trim());
+      setNewPlaylistName('');
+      setIsCreatingPlaylist(false);
+      await loadPlaylists();
+    } catch (error) {
+      console.error('Failed to create playlist:', error);
+      alert('Failed to create playlist');
+    }
+  };
+
+  const handleDeletePlaylist = async (playlistId, playlistName, e) => {
+    e.stopPropagation();
+    
+    if (!confirm(`Delete playlist "${playlistName}"?`)) return;
+    
+    try {
+      await window.api.deletePlaylist(playlistId);
+      await loadPlaylists();
+      
+      // If deleted playlist was selected, switch to Music
+      if (selectedMenuItemId === playlistId) {
+        onMenuSelect('music');
+      }
+    } catch (error) {
+      console.error('Failed to delete playlist:', error);
+      alert('Failed to delete playlist');
+    }
   };
 
   const renderMenuSection = (items, sectionTitle, scrollable = false) => (
@@ -63,7 +108,62 @@ function Sidebar({ selectedMenuItemId, onMenuSelect }) {
 
       {/* Scrollable playlists */}
       <div className="scrollable-playlists">
-        {renderMenuSection(playlistItems, 'PLAYLISTS', true)}
+        <div className="menu-section scrollable">
+          <div className="section-title">
+            PLAYLISTS
+            <button 
+              className="add-playlist-btn"
+              onClick={() => setIsCreatingPlaylist(true)}
+              title="Create new playlist"
+            >
+              +
+            </button>
+          </div>
+          
+          {isCreatingPlaylist && (
+            <div className="create-playlist-form">
+              <input
+                type="text"
+                placeholder="Playlist name"
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreatePlaylist();
+                  if (e.key === 'Escape') {
+                    setIsCreatingPlaylist(false);
+                    setNewPlaylistName('');
+                  }
+                }}
+                autoFocus
+              />
+              <div className="form-buttons">
+                <button onClick={handleCreatePlaylist}>Create</button>
+                <button onClick={() => {
+                  setIsCreatingPlaylist(false);
+                  setNewPlaylistName('');
+                }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          
+          {playlists.map(playlist => (
+            <div
+              key={playlist.id}
+              className={`menu-item ${selectedMenuItemId === playlist.id ? 'active' : ''}`}
+              onClick={() => onMenuSelect(playlist.id)}
+            >
+              <span className="menu-icon">📁</span>
+              <span className="menu-text">{playlist.name}</span>
+              <button
+                className="delete-playlist-btn"
+                onClick={(e) => handleDeletePlaylist(playlist.id, playlist.name, e)}
+                title="Delete playlist"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Fixed bottom section - ALWAYS stays at bottom */}

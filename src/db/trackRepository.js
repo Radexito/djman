@@ -74,3 +74,19 @@ export function clearTracks() {
   db.prepare(`DELETE FROM tracks`).run();
   db.prepare(`VACUUM`).run();
 }
+
+export function deleteTrack(id) {
+  console.log(`Deleting track ${id}`);
+  
+  // First, remove from all playlists
+  db.prepare(`DELETE FROM playlist_tracks WHERE track_id = ?`).run(id);
+  
+  // Then delete the track
+  const track = db.prepare(`SELECT file_path FROM tracks WHERE id = ?`).get(id);
+  db.prepare(`DELETE FROM tracks WHERE id = ?`).run(id);
+  
+  // Note: We're not deleting the actual file from disk to avoid data loss
+  // The file remains in the audio storage folder
+  
+  return track;
+}
