@@ -46,13 +46,16 @@ def create_test_audio_file(filename='/tmp/test_track.mp3', bpm=120):
         # Generate audio with periodic beats
         t = np.linspace(0, duration, int(sample_rate * duration))
         
-        # Create a base tone at A (440 Hz) 
+        # Create a base tone at A (440 Hz)
+        # Using A440 as it's the standard tuning reference, so key detection should identify this as key of A
         audio = 0.1 * np.sin(2 * np.pi * 440.0 * t)
         
         # Add periodic kicks to establish tempo
         beat_times = np.arange(0, duration, beat_interval)
         for beat_time in beat_times:
             # Create a kick drum sound (low frequency burst)
+            # Using 60 Hz (bass frequency) with exponential decay to simulate a kick drum
+            # The decay rate of 20 gives a natural-sounding kick with ~50ms effective duration
             kick_duration = 0.1  # 100ms kick
             kick_start = int(beat_time * sample_rate)
             kick_end = min(kick_start + int(kick_duration * sample_rate), len(audio))

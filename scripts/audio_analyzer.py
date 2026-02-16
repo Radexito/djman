@@ -77,13 +77,18 @@ def analyze_audio(file_path):
         key, scale, strength = key_extractor(audio)
         
         # Calculate loudness using ReplayGain algorithm
-        # This gives us a dB value similar to LUFS
+        # ReplayGain measures how much gain adjustment is needed to reach a target loudness
+        # It returns a positive value when audio needs to be amplified, negative when it needs to be attenuated
+        # 
+        # ReplayGain targets -18 dBFS reference level, while EBU R128 LUFS targets -23 LUFS
+        # The relationship is: LUFS = -18 - ReplayGain
+        # 
+        # Example: If ReplayGain = +3 dB (audio is quiet, needs boost)
+        #          then LUFS = -18 - 3 = -21 LUFS (quieter than reference)
+        # Example: If ReplayGain = -6 dB (audio is loud, needs attenuation)
+        #          then LUFS = -18 - (-6) = -12 LUFS (louder than reference)
         replay_gain = es.ReplayGain()
         gain = replay_gain(audio)
-        
-        # Convert ReplayGain to approximate LUFS
-        # ReplayGain targets -18 dBFS, while EBU R128 targets -23 LUFS
-        # The relationship is approximately: LUFS ≈ -18 - ReplayGain
         lufs = -18.0 - gain
         
         # Convert key to Camelot notation
