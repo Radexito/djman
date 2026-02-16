@@ -141,4 +141,13 @@ vite.config.ts.timestamp-*
 .vite/
 ffmpeg/
 
+# Test fixtures (generated audio files)
+test/fixtures/*.mp3
+test/fixtures/*.wav
+test/fixtures/*.flac
+
+# Database
 library.db
+
+# Test coverage
+coverage/

@@ -10,7 +10,11 @@
     "build-renderer": "cd renderer && npm run build",
     "build": "npm run build-renderer",
     "electron-prod": "NODE_ENV=production electron .",
-    "postinstall": "electron-rebuild"
+    "postinstall": "electron-rebuild",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "generate-fixtures": "node scripts/generate-test-fixtures.js"
   },
   "repository": {
     "type": "git",
@@ -25,9 +29,11 @@
   },
   "homepage": "https://github.com/Radexito/djman#readme",
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
     "concurrently": "^9.2.1",
     "electron": "^40.0.0",
     "electron-rebuild": "^3.2.9",
+    "jest": "^30.2.0",
     "wait-on": "^9.0.3"
   },
   "dependencies": {

@@ -1,0 +1,37 @@
+{
+  "description": "Expected values for test audio fixtures",
+  "samples": [
+    {
+      "filename": "test-120bpm-C-major.mp3",
+      "expected": {
+        "bpm": 120,
+        "key_raw": "C",
+        "key_camelot": "8B"
+      }
+    },
+    {
+      "filename": "test-128bpm-Am.mp3",
+      "expected": {
+        "bpm": 128,
+        "key_raw": "Am",
+        "key_camelot": "11A"
+      }
+    },
+    {
+      "filename": "test-140bpm-Dm.mp3",
+      "expected": {
+        "bpm": 140,
+        "key_raw": "Dm",
+        "key_camelot": "10A"
+      }
+    },
+    {
+      "filename": "test-100bpm-G-major.mp3",
+      "expected": {
+        "bpm": 100,
+        "key_raw": "G",
+        "key_camelot": "9B"
+      }
+    }
+  ]
+}

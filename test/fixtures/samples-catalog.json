@@ -1,0 +1,21 @@
+{
+  "samples": [
+    {
+      "name": "test-120bpm-Cmaj.mp3",
+      "url": "https://freesound.org/data/previews/639/639848_10615440-lq.mp3",
+      "expected": {
+        "bpm": 120,
+        "key_raw": "C",
+        "key_camelot": "8B",
+        "description": "120 BPM drum loop in C major"
+      },
+      "license": "CC0 1.0",
+      "source": "Freesound.org"
+    }
+  ],
+  "notes": [
+    "These are small preview samples from Freesound.org (CC licensed)",
+    "Full metadata is embedded in the files where available",
+    "Some samples may not have embedded BPM/key tags - we'll add them via the script"
+  ]
+}
