@@ -118,8 +118,31 @@ djman/
 ├── renderer/          # React frontend
 │   └── src/          # React components and UI
 ├── scripts/          # Utility scripts
+├── test/             # Unit tests and fixtures
+│   ├── fixtures/     # Test audio files
+│   └── unit/         # Test suites
 └── ffmpeg/           # FFmpeg binaries (auto-generated)
 ```
+
+### Testing
+
+Run the test suite to validate audio analysis logic:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+
+# Generate test audio fixtures
+npm run generate-fixtures
+```
+
+See [test/README.md](test/README.md) for more information about the testing infrastructure.
 
 ### Troubleshooting
 
