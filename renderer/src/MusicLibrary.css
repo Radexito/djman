@@ -21,7 +21,7 @@
 /* Header */
 .header {
   display: grid;
-  grid-template-columns: 5% 30% 25% 8% 8% 8% 8% 8%;
+  grid-template-columns: 4% 22% 18% 8% 7% 7% 7% 7% 15% 5%;
   padding: 12px 8px;
   background-color: #2a2a2a;
   color: #e0e0e0;
@@ -47,7 +47,7 @@
   height: 50px;
   width: 100%;
   display: grid;
-  grid-template-columns: 5% 30% 25% 8% 8% 8% 8% 8%;
+  grid-template-columns: 4% 22% 18% 8% 7% 7% 7% 7% 15% 5%;
   align-items: center;
   padding: 0 8px;
   cursor: pointer;
@@ -62,6 +62,11 @@
   background-color: #222222;
 }
 
+.row-editing {
+  background-color: #2a2a2a !important;
+  border: 1px solid #1db954;
+}
+
 .row-loading {
   color: #aaa;
   background-color: #1a1a1a;
@@ -72,6 +77,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding: 0 4px;
 }
 
 .cell.index {
@@ -92,10 +98,108 @@
   color: #aaa;
 }
 
-.cell.status {
+.cell.comments {
+  color: #aaa;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.cell.rating {
+  display: flex;
+  align-items: center;
+}
+
+.cell.actions {
   text-align: center;
+}
+
+/* Star Rating */
+.star-rating {
+  display: flex;
+  gap: 2px;
+}
+
+.star {
+  cursor: pointer;
+  color: #555;
   font-size: 16px;
-  color: #4ade80;
+  transition: color 0.2s;
+}
+
+.star.filled {
+  color: #ffd700;
+}
+
+.star.editable:hover {
+  color: #ffed4e;
+}
+
+/* Edit Mode */
+.cell-edit {
+  width: 100%;
+  padding: 4px 6px;
+  background-color: #333;
+  border: 1px solid #555;
+  color: #fff;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.cell-edit:focus {
+  outline: none;
+  border-color: #1db954;
+}
+
+/* Action Buttons */
+.edit-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.save-btn,
+.cancel-btn,
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.save-btn {
+  color: #1db954;
+}
+
+.save-btn:hover {
+  background-color: #1db954;
+  color: #fff;
+}
+
+.cancel-btn {
+  color: #ff4444;
+}
+
+.cancel-btn:hover {
+  background-color: #ff4444;
+  color: #fff;
+}
+
+.delete-btn {
+  color: #666;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.row:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  color: #ff4444;
+  background-color: rgba(255, 68, 68, 0.1);
 }
 
 /* react-window */

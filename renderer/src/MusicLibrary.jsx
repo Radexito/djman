@@ -11,6 +11,8 @@ function MusicLibrary({ selectedPlaylist }) {
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [editingTrack, setEditingTrack] = useState(null);
+  const [editedData, setEditedData] = useState({});
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
@@ -18,14 +20,16 @@ function MusicLibrary({ selectedPlaylist }) {
   const sortedTracksRef = useRef([]);
 
   const columns = [
-    { key: 'index', label: '#', width: '5%' },
-    { key: 'title', label: 'Title', width: '30%' },
-    { key: 'artist', label: 'Artist', width: '25%' },
-    { key: 'bpm', label: 'BPM', width: '8%' },
-    { key: 'key_camelot', label: 'Key', width: '8%' },
-    { key: 'energy', label: 'Energy', width: '8%' },
-    { key: 'loudness', label: 'Loudness', width: '8%' },
-    { key: 'status', label: 'Status', width: '8%' },
+    { key: 'index', label: '#', width: '4%' },
+    { key: 'title', label: 'Title', width: '22%' },
+    { key: 'artist', label: 'Artist', width: '18%' },
+    { key: 'rating', label: '★', width: '8%' },
+    { key: 'bpm', label: 'BPM', width: '7%' },
+    { key: 'key_camelot', label: 'Key', width: '7%' },
+    { key: 'energy', label: 'Energy', width: '7%' },
+    { key: 'loudness', label: 'Loud', width: '7%' },
+    { key: 'comments', label: 'Notes', width: '15%' },
+    { key: 'actions', label: '', width: '5%' },
   ];
 
   const [sortBy, setSortBy] = useState({ key: 'index', asc: true });
@@ -91,6 +95,68 @@ function MusicLibrary({ selectedPlaylist }) {
     }));
   }, []);
 
+  const handleEditStart = (track) => {
+    setEditingTrack(track.id);
+    setEditedData({
+      title: track.title,
+      artist: track.artist || '',
+      rating: track.rating || 0,
+      comments: track.comments || '',
+    });
+  };
+
+  const handleEditSave = async (trackId) => {
+    try {
+      await window.api.updateTrack(trackId, editedData);
+      
+      // Update local state
+      setTracks(prev => prev.map(t => 
+        t.id === trackId ? { ...t, ...editedData } : t
+      ));
+      
+      setEditingTrack(null);
+      setEditedData({});
+    } catch (error) {
+      console.error('Failed to update track:', error);
+      alert('Failed to update track');
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingTrack(null);
+    setEditedData({});
+  };
+
+  const handleDelete = async (track) => {
+    if (!confirm(`Delete "${track.title}" from library?`)) return;
+    
+    try {
+      await window.api.deleteTrack(track.id);
+      
+      // Remove from local state
+      setTracks(prev => prev.filter(t => t.id !== track.id));
+    } catch (error) {
+      console.error('Failed to delete track:', error);
+      alert('Failed to delete track');
+    }
+  };
+
+  const StarRating = ({ rating, onRate, editable }) => {
+    return (
+      <div className="star-rating">
+        {[1, 2, 3, 4, 5].map(star => (
+          <span
+            key={star}
+            className={`star ${star <= rating ? 'filled' : ''} ${editable ? 'editable' : ''}`}
+            onClick={() => editable && onRate(star)}
+          >
+            ★
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   const Row = ({ index, style }) => {
     const t = sortedTracksRef.current[index];
 
@@ -102,20 +168,97 @@ function MusicLibrary({ selectedPlaylist }) {
       );
     }
 
+    const isEditing = editingTrack === t.id;
+
     return (
       <div
         style={style}
-        className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}`}
-        title={`${t.title} - ${t.artist || 'Unknown'}`}
+        className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'} ${isEditing ? 'row-editing' : ''}`}
       >
         <div className="cell index">{index + 1}</div>
-        <div className="cell title">{t.title}</div>
-        <div className="cell artist">{t.artist || 'Unknown'}</div>
+        
+        {/* Title */}
+        {isEditing ? (
+          <input
+            className="cell-edit"
+            value={editedData.title}
+            onChange={(e) => setEditedData({ ...editedData, title: e.target.value })}
+            placeholder="Title"
+          />
+        ) : (
+          <div className="cell title" onDoubleClick={() => handleEditStart(t)}>
+            {t.title}
+          </div>
+        )}
+        
+        {/* Artist */}
+        {isEditing ? (
+          <input
+            className="cell-edit"
+            value={editedData.artist}
+            onChange={(e) => setEditedData({ ...editedData, artist: e.target.value })}
+            placeholder="Artist"
+          />
+        ) : (
+          <div className="cell artist" onDoubleClick={() => handleEditStart(t)}>
+            {t.artist || 'Unknown'}
+          </div>
+        )}
+        
+        {/* Rating */}
+        <div className="cell rating">
+          {isEditing ? (
+            <StarRating
+              rating={editedData.rating}
+              onRate={(r) => setEditedData({ ...editedData, rating: r })}
+              editable
+            />
+          ) : (
+            <StarRating
+              rating={t.rating || 0}
+              onRate={(r) => {
+                window.api.updateTrack(t.id, { rating: r });
+                setTracks(prev => prev.map(track => 
+                  track.id === t.id ? { ...track, rating: r } : track
+                ));
+              }}
+              editable
+            />
+          )}
+        </div>
+        
         <div className="cell numeric">{t.bpm ?? '...'}</div>
         <div className="cell numeric">{t.key_camelot ?? '...'}</div>
         <div className="cell numeric">{t.energy ?? '...'}</div>
         <div className="cell numeric">{t.loudness ?? '...'}</div>
-        <div className="cell status">{t.analyzed ? '✅' : '🔄'}</div>
+        
+        {/* Comments */}
+        {isEditing ? (
+          <input
+            className="cell-edit"
+            value={editedData.comments}
+            onChange={(e) => setEditedData({ ...editedData, comments: e.target.value })}
+            placeholder="Notes"
+          />
+        ) : (
+          <div className="cell comments" onDoubleClick={() => handleEditStart(t)}>
+            {t.comments || ''}
+          </div>
+        )}
+        
+        {/* Actions */}
+        <div className="cell actions">
+          {isEditing ? (
+            <div className="edit-actions">
+              <button className="save-btn" onClick={() => handleEditSave(t.id)}>✓</button>
+              <button className="cancel-btn" onClick={handleEditCancel}>✕</button>
+            </div>
+          ) : (
+            <button className="delete-btn" onClick={() => handleDelete(t)} title="Delete track">
+              🗑
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -133,8 +276,8 @@ function MusicLibrary({ selectedPlaylist }) {
         {columns.map(col => (
           <div
             key={col.key}
-            className={`header-cell ${['bpm','key_camelot','energy','loudness','status'].includes(col.key) ? 'right' : ''}`}
-            onClick={() => handleSort(col.key)}
+            className={`header-cell ${['rating','bpm','key_camelot','energy','loudness'].includes(col.key) ? 'right' : ''}`}
+            onClick={() => col.key !== 'actions' && handleSort(col.key)}
           >
             {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
           </div>
