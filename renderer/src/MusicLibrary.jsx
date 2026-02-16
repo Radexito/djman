@@ -107,15 +107,20 @@ function MusicLibrary({ selectedPlaylist }) {
 
   const handleEditSave = async (trackId) => {
     try {
-      await window.api.updateTrack(trackId, editedData);
+      const result = await window.api.updateTrack(trackId, editedData);
       
-      // Update local state
-      setTracks(prev => prev.map(t => 
-        t.id === trackId ? { ...t, ...editedData } : t
-      ));
-      
-      setEditingTrack(null);
-      setEditedData({});
+      if (result.success) {
+        // Update local state
+        setTracks(prev => prev.map(t => 
+          t.id === trackId ? { ...t, ...editedData } : t
+        ));
+        
+        setEditingTrack(null);
+        setEditedData({});
+      } else {
+        console.error('Failed to update track:', result.error);
+        alert(`Failed to update track: ${result.error}`);
+      }
     } catch (error) {
       console.error('Failed to update track:', error);
       alert('Failed to update track');
@@ -216,11 +221,21 @@ function MusicLibrary({ selectedPlaylist }) {
           ) : (
             <StarRating
               rating={t.rating || 0}
-              onRate={(r) => {
-                window.api.updateTrack(t.id, { rating: r });
-                setTracks(prev => prev.map(track => 
-                  track.id === t.id ? { ...track, rating: r } : track
-                ));
+              onRate={async (r) => {
+                try {
+                  const result = await window.api.updateTrack(t.id, { rating: r });
+                  if (result.success) {
+                    setTracks(prev => prev.map(track => 
+                      track.id === t.id ? { ...track, rating: r } : track
+                    ));
+                  } else {
+                    console.error('Failed to update rating:', result.error);
+                    alert('Failed to update rating');
+                  }
+                } catch (error) {
+                  console.error('Failed to update rating:', error);
+                  alert('Failed to update rating');
+                }
               }}
               editable
             />

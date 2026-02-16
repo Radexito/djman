@@ -59,39 +59,84 @@ async function initApp() {
 // Track operations
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
 ipcMain.handle('add-track', (event, track) => addTrack(track));
-ipcMain.handle('update-track', (event, id, data) => {
-  updateTrack(id, data);
-  return true;
+ipcMain.handle('update-track', async (event, id, data) => {
+  try {
+    updateTrack(id, data);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update track:', error);
+    return { success: false, error: error.message };
+  }
 });
 ipcMain.handle('delete-track', async (event, id) => {
   try {
     await deleteTrack(id);
     return { success: true };
   } catch (error) {
+    console.error('Failed to delete track:', error);
     return { success: false, error: error.message };
   }
 });
 
 // Playlist operations
 ipcMain.handle('get-playlists', async () => {
-  return getAllPlaylists();
+  try {
+    return getAllPlaylists();
+  } catch (error) {
+    console.error('Failed to get playlists:', error);
+    throw error;
+  }
 });
-ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
-ipcMain.handle('delete-playlist', (event, id) => {
-  deletePlaylist(id);
-  return true;
+ipcMain.handle('create-playlist', async (event, name) => {
+  try {
+    return createPlaylist(name);
+  } catch (error) {
+    console.error('Failed to create playlist:', error);
+    throw error;
+  }
 });
-ipcMain.handle('add-track-to-playlist', (event, playlistId, trackId, order) =>
-  addTrackToPlaylist(playlistId, trackId, order)
-);
-ipcMain.handle('get-playlist-tracks', (event, playlistId) => getPlaylistTracks(playlistId));
-ipcMain.handle('remove-track-from-playlist', (event, playlistId, trackId) => {
-  removeTrackFromPlaylist(playlistId, trackId);
-  return true;
+ipcMain.handle('delete-playlist', async (event, id) => {
+  try {
+    deletePlaylist(id);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete playlist:', error);
+    return { success: false, error: error.message };
+  }
 });
-ipcMain.handle('update-track-order', (event, playlistId, trackId, newOrder) => {
-  updateTrackOrder(playlistId, trackId, newOrder);
-  return true;
+ipcMain.handle('add-track-to-playlist', async (event, playlistId, trackId, order) => {
+  try {
+    return addTrackToPlaylist(playlistId, trackId, order);
+  } catch (error) {
+    console.error('Failed to add track to playlist:', error);
+    throw error;
+  }
+});
+ipcMain.handle('get-playlist-tracks', async (event, playlistId) => {
+  try {
+    return getPlaylistTracks(playlistId);
+  } catch (error) {
+    console.error('Failed to get playlist tracks:', error);
+    throw error;
+  }
+});
+ipcMain.handle('remove-track-from-playlist', async (event, playlistId, trackId) => {
+  try {
+    removeTrackFromPlaylist(playlistId, trackId);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to remove track from playlist:', error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle('update-track-order', async (event, playlistId, trackId, newOrder) => {
+  try {
+    updateTrackOrder(playlistId, trackId, newOrder);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update track order:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // File operations
