@@ -28,7 +28,13 @@ Test fixtures are small MP3 files with known BPM and key values embedded in thei
 
 ## Generating Test Fixtures
 
-To regenerate the test audio files:
+Test fixtures are **automatically generated** before running tests. If fixtures are missing or outdated, they will be regenerated when you run:
+
+```bash
+npm test
+```
+
+You can also manually regenerate them at any time:
 
 ```bash
 npm run generate-fixtures
@@ -38,6 +44,18 @@ This script:
 1. Creates small 2-second audio files using FFmpeg
 2. Embeds BPM and key metadata in ID3 tags
 3. Saves them to `test/fixtures/`
+4. Generates `expected-values.json` with correct Camelot notation
+
+### Troubleshooting Fixture Issues
+
+**If tests fail with "Fixture not found" warnings:**
+1. Run `npm run generate-fixtures` to manually regenerate
+2. Make sure FFmpeg is installed (see main README)
+
+**If tests fail with incorrect Camelot notation:**
+1. Delete old fixtures: `rm test/fixtures/*.mp3`
+2. Regenerate: `npm run generate-fixtures`
+3. This ensures `expected-values.json` has the correct mappings
 
 **Requirements:** FFmpeg must be installed on your system.
 

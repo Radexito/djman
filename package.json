@@ -11,6 +11,7 @@
     "build": "npm run build-renderer",
     "electron-prod": "NODE_ENV=production electron .",
     "postinstall": "electron-rebuild",
+    "pretest": "node scripts/setup-test-fixtures.js --quiet",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
