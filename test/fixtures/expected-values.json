@@ -14,7 +14,7 @@
       "expected": {
         "bpm": 128,
         "key_raw": "Am",
-        "key_camelot": "11A"
+        "key_camelot": "8A"
       }
     },
     {
@@ -22,7 +22,7 @@
       "expected": {
         "bpm": 140,
         "key_raw": "Dm",
-        "key_camelot": "10A"
+        "key_camelot": "7A"
       }
     },
     {
