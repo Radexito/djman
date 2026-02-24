@@ -1,18 +1,55 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { FixedSizeList as List } from 'react-window';
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay,
+} from '@dnd-kit/core';
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import './MusicLibrary.css';
 
 const PAGE_SIZE = 50;
 const ROW_HEIGHT = 50;
 const PRELOAD_TRIGGER = 3;
 
+// ── SortableRow — must be defined outside MusicLibrary to avoid remount ────
+function SortableRow({ t, index, isSelected, onRowClick, onContextMenu }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const bpmValue = t.bpm_override ?? t.bpm;
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}${isSelected ? ' row--selected' : ''}`}
+      title={`${t.title} - ${t.artist || 'Unknown'}`}
+      onClick={(e) => onRowClick(e, t, index)}
+      onContextMenu={(e) => onContextMenu(e, t, index)}
+    >
+      <div className="cell index drag-handle" {...attributes} {...listeners}>⠿</div>
+      <div className="cell title">{t.title}</div>
+      <div className="cell artist">{t.artist || 'Unknown'}</div>
+      <div className={`cell numeric${t.bpm_override != null ? ' bpm--overridden' : ''}`}>{bpmValue ?? '...'}</div>
+      <div className="cell numeric">{t.key_camelot ?? '...'}</div>
+      <div className="cell numeric">{t.loudness != null ? t.loudness : '...'}</div>
+    </div>
+  );
+}
+
 function MusicLibrary({ selectedPlaylist }) {
+  const isPlaylistView = selectedPlaylist !== 'music';
+
   const [tracks, setTracks] = useState([]);
   const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [contextMenu, setContextMenu] = useState(null); // { x, y, targetIds }
+  const [playlistSubmenu, setPlaylistSubmenu] = useState(null); // [{ id, name, color, is_member }]
   const [loadKey, setLoadKey] = useState(0);
+  const [playlistInfo, setPlaylistInfo] = useState(null); // { name, total_duration, track_count }
+  const [activeId, setActiveId] = useState(null); // DnD active drag id
+  const [sortSaved, setSortSaved] = useState(true); // false when sorted away from position order
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
@@ -64,8 +101,9 @@ function MusicLibrary({ selectedPlaylist }) {
   const sortedTracks = useMemo(() => {
     const sorted = [...tracks].sort((a, b) => {
       if (sortBy.key === 'index') return 0;
-      const va = a[sortBy.key] ?? '';
-      const vb = b[sortBy.key] ?? '';
+      // For BPM, prefer the override value
+      const va = sortBy.key === 'bpm' ? (a.bpm_override ?? a.bpm ?? '') : (a[sortBy.key] ?? '');
+      const vb = sortBy.key === 'bpm' ? (b.bpm_override ?? b.bpm ?? '') : (b[sortBy.key] ?? '');
       if (typeof va === 'string') return sortBy.asc ? va.localeCompare(vb) : vb.localeCompare(va);
       if (typeof va === 'number') return sortBy.asc ? va - vb : vb - va;
       return 0;
@@ -83,6 +121,8 @@ function MusicLibrary({ selectedPlaylist }) {
     setHasMore(true);
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = null;
+    setSortBy({ key: 'index', asc: true }); // reset sort when switching view/search
+    setSortSaved(true);
 
     // Use setTimeout so the state updates above are committed before we load.
     // The cleanup cancels the timer — in StrictMode this means the first
@@ -112,6 +152,21 @@ function MusicLibrary({ selectedPlaylist }) {
     const unsub = window.api.onLibraryUpdated(() => setLoadKey(k => k + 1));
     return unsub;
   }, []);
+
+  // Reload playlist info (name, duration) when entering playlist view or tracks change
+  useEffect(() => {
+    if (!isPlaylistView) { setPlaylistInfo(null); return; }
+    window.api.getPlaylist(Number(selectedPlaylist)).then(setPlaylistInfo);
+  }, [isPlaylistView, selectedPlaylist, tracks.length]);
+
+  // Reload when playlists mutated externally (track added/removed)
+  useEffect(() => {
+    const unsub = window.api.onPlaylistsUpdated(() => setLoadKey(k => k + 1));
+    return unsub;
+  }, []);
+
+  // DnD sensors
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Ctrl+A — select all tracks including unloaded ones
   useEffect(() => {
@@ -161,15 +216,16 @@ function MusicLibrary({ selectedPlaylist }) {
 
   // ── Context menu ───────────────────────────────────────────────────────────
 
-  const handleContextMenu = useCallback((e, track, index) => {
+  const handleContextMenu = useCallback(async (e, track, index) => {
     e.preventDefault();
-    // If right-clicked track is already selected, menu targets all selected
-    // Otherwise, select only this track
     if (!selectedIds.has(track.id)) {
       setSelectedIds(new Set([track.id]));
       lastSelectedIndexRef.current = index;
     }
     const targetIds = selectedIds.has(track.id) ? [...selectedIds] : [track.id];
+    // Fetch playlist membership for single track (representative for submenu)
+    const playlists = await window.api.getPlaylistsForTrack(targetIds[0]);
+    setPlaylistSubmenu(playlists);
     setContextMenu({ x: e.clientX, y: e.clientY, targetIds });
   }, [selectedIds]);
 
@@ -190,6 +246,27 @@ function MusicLibrary({ selectedPlaylist }) {
     setSelectedIds(new Set());
     offsetRef.current = Math.max(0, offsetRef.current - targetIds.length);
   }, [contextMenu]);
+
+  const handleRemoveFromPlaylist = useCallback(async () => {
+    const targetIds = contextMenu?.targetIds ?? [];
+    setContextMenu(null);
+    for (const id of targetIds) {
+      await window.api.removeTrackFromPlaylist(Number(selectedPlaylist), id);
+    }
+    setTracks(prev => prev.filter(t => !targetIds.includes(t.id)));
+    setSelectedIds(new Set());
+    offsetRef.current = Math.max(0, offsetRef.current - targetIds.length);
+  }, [contextMenu, selectedPlaylist]);
+
+  const handleAddToPlaylist = useCallback(async (playlistId, targetIds) => {
+    setContextMenu(null);
+    if (!targetIds?.length) return;
+    try {
+      await window.api.addTracksToPlaylist(playlistId, targetIds);
+    } catch (err) {
+      console.error('addTracksToPlaylist failed:', err);
+    }
+  }, []);
 
   const handleBpmAdjust = useCallback(async (factor) => {
     const targetIds = contextMenu?.targetIds ?? [];
@@ -213,7 +290,34 @@ function MusicLibrary({ selectedPlaylist }) {
     }));
   }, [contextMenu]);
 
+  // ── DnD (playlist view only) ───────────────────────────────────────────────
+
+  const handleDragStart = useCallback(({ active }) => setActiveId(active.id), []);
+
+  const handleDragEnd = useCallback(({ active, over }) => {
+    setActiveId(null);
+    if (!over || active.id === over.id) return;
+    setSortBy({ key: 'index', asc: true }); // reset sort so DnD operates on position order
+    const prev = sortedTracksRef.current;
+    const oldIndex = prev.findIndex(t => t.id === active.id);
+    const newIndex = prev.findIndex(t => t.id === over.id);
+    const reordered = arrayMove(prev, oldIndex, newIndex);
+    setTracks(reordered);
+    window.api.reorderPlaylist(Number(selectedPlaylist), reordered.map(t => t.id));
+    setSortSaved(true);
+  }, [selectedPlaylist]);
+
+  const handleSaveOrder = useCallback(async () => {
+    await window.api.reorderPlaylist(
+      Number(selectedPlaylist),
+      sortedTracksRef.current.map(t => t.id)
+    );
+    setSortBy({ key: 'index', asc: true }); // revert to position order after saving
+    setSortSaved(true);
+  }, [selectedPlaylist]);
+
   // ── Misc ───────────────────────────────────────────────────────────────────
+
 
   const handleItemsRendered = useCallback(({ visibleStopIndex }) => {
     if (visibleStopIndex >= sortedTracksRef.current.length - PRELOAD_TRIGGER) {
@@ -222,13 +326,14 @@ function MusicLibrary({ selectedPlaylist }) {
   }, [loadTracks]);
 
   const handleSort = useCallback((key) => {
-    setSortBy(prev => ({
-      key,
-      asc: prev.key === key ? !prev.asc : true,
-    }));
-  }, []);
+    setSortBy(prev => {
+      const next = { key, asc: prev.key === key ? !prev.asc : true };
+      if (isPlaylistView) setSortSaved(next.key === 'index');
+      return next;
+    });
+  }, [isPlaylistView]);
 
-  // ── Row ────────────────────────────────────────────────────────────────────
+  // ── Row (library view) ──────────────────────────────────────────────────────
 
   const Row = ({ index, style }) => {
     const t = sortedTracksRef.current[index];
@@ -268,6 +373,15 @@ function MusicLibrary({ selectedPlaylist }) {
     ? ` (${contextMenu.targetIds.length} tracks)`
     : '';
 
+  const formatDuration = (secs) => {
+    if (!secs) return '';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const activeTrack = activeId ? tracks.find(t => t.id === activeId) : null;
+
   return (
     <div className="music-library">
       <input
@@ -276,6 +390,21 @@ function MusicLibrary({ selectedPlaylist }) {
         value={search}
         onChange={e => setSearch(e.target.value)}
       />
+
+      {/* Playlist header bar */}
+      {isPlaylistView && playlistInfo && (
+        <div className="playlist-header-bar">
+          <span className="playlist-header-name">{playlistInfo.name}</span>
+          <span className="playlist-header-meta">
+            {playlistInfo.track_count} tracks · {formatDuration(playlistInfo.total_duration)}
+          </span>
+          {!sortSaved && (
+            <button className="btn-save-order" onClick={handleSaveOrder}>
+              💾 Save Order
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="header">
         {columns.map(col => (
@@ -289,17 +418,58 @@ function MusicLibrary({ selectedPlaylist }) {
         ))}
       </div>
 
-      <List
-        ref={listRef}
-        height={600}
-        itemCount={sortedTracks.length + (hasMore ? 1 : 0)}
-        itemSize={ROW_HEIGHT}
-        width="100%"
-        onItemsRendered={handleItemsRendered}
-        className="track-list"
-      >
-        {Row}
-      </List>
+      {/* Playlist view: full DnD list */}
+      {isPlaylistView ? (
+        tracks.length === 0 ? (
+          <div className="playlist-empty-state">
+            No tracks in this playlist.<br />Right-click tracks in your library to add them.
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={sortedTracks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+              <div className="playlist-dnd-list">
+                {sortedTracks.map((t, index) => (
+                  <SortableRow
+                    key={t.id}
+                    t={t}
+                    index={index}
+                    isSelected={selectedIds.has(t.id)}
+                    onRowClick={handleRowClick}
+                    onContextMenu={handleContextMenu}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeTrack && (
+                <div className="row row-drag-overlay">
+                  <div className="cell index">⠿</div>
+                  <div className="cell title">{activeTrack.title}</div>
+                  <div className="cell artist">{activeTrack.artist || 'Unknown'}</div>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        )
+      ) : (
+        /* Library view: virtualised list */
+        <List
+          ref={listRef}
+          height={600}
+          itemCount={sortedTracks.length + (hasMore ? 1 : 0)}
+          itemSize={ROW_HEIGHT}
+          width="100%"
+          onItemsRendered={handleItemsRendered}
+          className="track-list"
+        >
+          {Row}
+        </List>
+      )}
 
       {contextMenu && (
         <div
@@ -313,21 +483,42 @@ function MusicLibrary({ selectedPlaylist }) {
           <div className="context-menu-item context-menu-item--has-submenu">
             🎵 BPM{selectionLabel}
             <div className="context-submenu">
-              <div className="context-menu-item" onClick={() => handleBpmAdjust(2)}>
-                ✕2 Double BPM
-              </div>
-              <div className="context-menu-item" onClick={() => handleBpmAdjust(0.5)}>
-                ÷2 Halve BPM
-              </div>
+              <div className="context-menu-item" onClick={() => handleBpmAdjust(2)}>✕2 Double BPM</div>
+              <div className="context-menu-item" onClick={() => handleBpmAdjust(0.5)}>÷2 Halve BPM</div>
             </div>
           </div>
-          <div className="context-menu-item context-menu-item--danger" onClick={handleRemove}>
-            🗑️ Remove{selectionLabel}
-          </div>
+          {isPlaylistView ? (
+            <div className="context-menu-item context-menu-item--danger" onClick={handleRemoveFromPlaylist}>
+              ➖ Remove from playlist{selectionLabel}
+            </div>
+          ) : (
+            <div className="context-menu-item context-menu-item--danger" onClick={handleRemove}>
+              🗑️ Remove from library{selectionLabel}
+            </div>
+          )}
           <div className="context-menu-separator" />
-          <div className="context-menu-item context-menu-item--disabled">
-            ➕ Add to playlist
-          </div>
+          {/* Add to Playlist submenu */}
+          {playlistSubmenu !== null && (
+            playlistSubmenu.length === 0 ? (
+              <div className="context-menu-item context-menu-item--disabled">➕ No playlists</div>
+            ) : (
+              <div className="context-menu-item context-menu-item--has-submenu">
+                ➕ Add to playlist
+                <div className="context-submenu">
+                  {playlistSubmenu.map(pl => (
+                    <div
+                      key={pl.id}
+                      className={`context-menu-item${pl.is_member ? ' context-menu-item--checked' : ''}`}
+                      onClick={() => !pl.is_member && handleAddToPlaylist(pl.id, contextMenu?.targetIds ?? [])}
+                    >
+                      {pl.color && <span className="ctx-color-dot" style={{ background: pl.color }} />}
+                      {pl.is_member ? '✓ ' : ''}{pl.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
@@ -335,4 +526,5 @@ function MusicLibrary({ selectedPlaylist }) {
 }
 
 export default MusicLibrary;
+
 

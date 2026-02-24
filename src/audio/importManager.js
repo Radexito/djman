@@ -48,11 +48,11 @@ export function spawnAnalysis(trackId, filePath) {
       return;
     }
     console.log(`Analysis finished for track ID ${trackId}:`, result);
-    updateTrack(trackId, result);
+    updateTrack(trackId, { ...result, bpm_override: null }); // clear any manual BPM override
 
     // Notify renderer
     if (global.mainWindow) {
-      global.mainWindow.webContents.send('track-updated', { trackId, analysis: result });
+      global.mainWindow.webContents.send('track-updated', { trackId, analysis: { ...result, bpm_override: null } });
     }
   });
 }

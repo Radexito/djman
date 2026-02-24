@@ -199,3 +199,85 @@
 .context-menu-item--has-submenu:hover .context-submenu {
   display: block;
 }
+
+/* ── Playlist header bar ───────────────────────────────────────────────── */
+.playlist-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 13px;
+}
+
+.playlist-header-name {
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.playlist-header-meta {
+  color: #888;
+  font-size: 12px;
+}
+
+.btn-save-order {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #555;
+  color: #ccc;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-save-order:hover { border-color: #888; color: #fff; }
+
+/* ── Playlist DnD list ─────────────────────────────────────────────────── */
+.playlist-dnd-list {
+  overflow-y: auto;
+  height: 600px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: #555;
+  font-size: 14px;
+}
+
+.drag-handle:active { cursor: grabbing; }
+
+.row-drag-overlay {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* ── Playlist empty state ──────────────────────────────────────────────── */
+.playlist-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #555;
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ── Context menu additions ────────────────────────────────────────────── */
+.context-menu-item--checked {
+  color: #4caf50;
+}
+
+.ctx-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}

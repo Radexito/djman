@@ -43,8 +43,22 @@ export function updateTrack(id, data) {
   `).run({ id, ...data });
 }
 
-export function getTracks({ limit = 50, offset = 0, search = '' }) {
-  console.log("getTracks called with:", { limit, offset, search });
+export function getTracks({ limit = 50, offset = 0, search = '', playlistId } = {}) {
+  if (playlistId) {
+    const q = search ? `%${search}%` : null;
+    const where = search
+      ? `AND (t.title LIKE @q OR t.artist LIKE @q OR t.album LIKE @q)`
+      : '';
+    return db.prepare(`
+      SELECT t.*
+      FROM playlist_tracks pt
+      JOIN tracks t ON t.id = pt.track_id
+      WHERE pt.playlist_id = @playlistId ${where}
+      ORDER BY pt.position ASC
+      LIMIT @limit OFFSET @offset
+    `).all({ playlistId, q, limit, offset });
+  }
+
   if (search) {
     return db.prepare(`
       SELECT *
@@ -54,11 +68,7 @@ export function getTracks({ limit = 50, offset = 0, search = '' }) {
          OR album LIKE @q
       ORDER BY created_at DESC
       LIMIT @limit OFFSET @offset
-    `).all({
-      q: `%${search}%`,
-      limit,
-      offset,
-    });
+    `).all({ q: `%${search}%`, limit, offset });
   }
 
   return db.prepare(`
@@ -69,7 +79,20 @@ export function getTracks({ limit = 50, offset = 0, search = '' }) {
   `).all(limit, offset);
 }
 
-export function getTrackIds({ search = '' } = {}) {
+export function getTrackIds({ search = '', playlistId } = {}) {
+  if (playlistId) {
+    const q = search ? `%${search}%` : null;
+    const where = search
+      ? `AND (t.title LIKE @q OR t.artist LIKE @q OR t.album LIKE @q)`
+      : '';
+    return db.prepare(`
+      SELECT t.id
+      FROM playlist_tracks pt
+      JOIN tracks t ON t.id = pt.track_id
+      WHERE pt.playlist_id = @playlistId ${where}
+      ORDER BY pt.position ASC
+    `).all({ playlistId, q }).map(r => r.id);
+  }
   if (search) {
     return db.prepare(`
       SELECT id FROM tracks
