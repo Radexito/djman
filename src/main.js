@@ -2,7 +2,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { initDB } from './db/migrations.js';
-// import { createPlaylist, addTrackToPlaylist, getPlaylistTracks } from './db/playlistRepository.js';
+import { createPlaylist, getPlaylists, getPlaylist, renamePlaylist, updatePlaylistColor, deletePlaylist, addTrackToPlaylist, addTracksToPlaylist, removeTrackFromPlaylist, reorderPlaylistTracks, getPlaylistsForTrack } from './db/playlistRepository.js';
 import { addTrack, getTracks, getTrackIds, getTrackById, removeTrack, updateTrack, normalizeLibrary } from './db/trackRepository.js';
 import { getSetting, setSetting } from './db/settingsRepository.js';
 import { importAudioFile, spawnAnalysis } from './audio/importManager.js';
@@ -84,7 +84,8 @@ ipcMain.handle('reanalyze-track', (_, trackId) => {
   return { ok: true };
 });
 ipcMain.handle('remove-track', (_, trackId) => {
-  removeTrack(trackId);
+  removeTrack(trackId); // ON DELETE CASCADE removes playlist_tracks rows
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
   return { ok: true };
 });
 ipcMain.handle('adjust-bpm', (_, { trackIds, factor }) => {
@@ -104,12 +105,43 @@ ipcMain.handle('adjust-bpm', (_, { trackIds, factor }) => {
   }
   return results;
 });
-// ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
+// Playlist IPC handlers
+ipcMain.handle('get-playlists', () => getPlaylists());
+ipcMain.handle('create-playlist', (_, { name, color }) => {
+  const id = createPlaylist(name, color ?? null);
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+  return id;
+});
+ipcMain.handle('rename-playlist', (_, { id, name }) => {
+  renamePlaylist(id, name);
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+});
+ipcMain.handle('update-playlist-color', (_, { id, color }) => {
+  updatePlaylistColor(id, color);
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+});
+ipcMain.handle('delete-playlist', (_, id) => {
+  deletePlaylist(id);
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+});
+ipcMain.handle('add-tracks-to-playlist', (_, { playlistId, trackIds }) => {
+  if (!Array.isArray(trackIds) || !trackIds.length) return;
+  addTracksToPlaylist(playlistId, trackIds);
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+});
+ipcMain.handle('remove-track-from-playlist', (_, { playlistId, trackId }) => {
+  removeTrackFromPlaylist(playlistId, trackId);
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+});
+ipcMain.handle('reorder-playlist', (_, { playlistId, orderedTrackIds }) => {
+  reorderPlaylistTracks(playlistId, orderedTrackIds);
+});
+ipcMain.handle('get-playlists-for-track', (_, trackId) => getPlaylistsForTrack(trackId));
+ipcMain.handle('get-playlist', (_, id) => getPlaylist(id));
+
 ipcMain.handle('add-track', (event, track) => addTrack(track));
-// ipcMain.handle('add-track-to-playlist', (event, playlistId, trackId, order) =>
-//   addTrackToPlaylist(playlistId, trackId, order)
-// );
-// ipcMain.handle('get-playlist-tracks', (event, playlistId) => getPlaylistTracks(playlistId));
+// Remove old commented-out stubs
+
 ipcMain.handle('select-audio-files', async () => {
   console.log('Selecting audio files');
   const result = await dialog.showOpenDialog({
