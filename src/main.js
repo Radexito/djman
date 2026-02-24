@@ -27,31 +27,42 @@ function createWindow() {
                  '.ogg':'audio/ogg',  '.m4a':'audio/mp4',  '.aac':'audio/aac' };
   protocol.handle('media', async (request) => {
     try {
-      const filePath = new URL(request.url).pathname;
+      const filePath = decodeURIComponent(new URL(request.url).pathname);
       const stat     = await fs.promises.stat(filePath);
       const total    = stat.size;
       const ext      = path.extname(filePath).toLowerCase();
       const mime     = MIME[ext] || 'audio/mpeg';
       const range    = request.headers.get('Range');
 
+      const makeStream = (opts) => {
+        const nodeStream = fs.createReadStream(filePath, opts);
+        // Suppress abort errors when Chromium cancels a request mid-stream
+        nodeStream.on('error', (err) => {
+          // Suppress normal abort errors from Chromium cancelling requests on track switch
+          const expected = ['ERR_STREAM_DESTROYED', 'ECONNRESET', 'ABORT_ERR', 'ERR_ABORTED'];
+          if (!expected.includes(err.code)) {
+            console.error('media:// stream error:', err.code, filePath);
+          }
+        });
+        return Readable.toWeb(nodeStream);
+      };
+
       if (range) {
         const [, s, e] = range.match(/bytes=(\d+)-(\d*)/) || [];
         const start    = parseInt(s, 10);
         const end      = e ? Math.min(parseInt(e, 10), total - 1) : total - 1;
-        const webStream = Readable.toWeb(fs.createReadStream(filePath, { start, end }));
-        return new Response(webStream, {
+        return new Response(makeStream({ start, end }), {
           status: 206,
           headers: {
-            'Content-Type':  mime,
-            'Content-Range': `bytes ${start}-${end}/${total}`,
-            'Accept-Ranges': 'bytes',
+            'Content-Type':   mime,
+            'Content-Range':  `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges':  'bytes',
             'Content-Length': String(end - start + 1),
           },
         });
       }
 
-      const webStream = Readable.toWeb(fs.createReadStream(filePath));
-      return new Response(webStream, {
+      return new Response(makeStream({}), {
         status: 200,
         headers: {
           'Content-Type':   mime,
@@ -60,7 +71,7 @@ function createWindow() {
         },
       });
     } catch (err) {
-      console.error('media:// error:', err);
+      if (err.code !== 'ENOENT') console.error('media:// error:', err.code, err.message);
       return new Response('Not found', { status: 404 });
     }
   });
