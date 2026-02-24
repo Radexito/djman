@@ -154,3 +154,47 @@
   background: #3a3a3a;
   margin: 4px 0;
 }
+
+/* Selected rows */
+.row--selected {
+  background: #1a3a5c !important;
+  outline: 1px solid #2d6aa0;
+  outline-offset: -1px;
+}
+
+/* BPM overridden indicator */
+.bpm--overridden {
+  color: #7eb8f7;
+  font-style: italic;
+}
+
+/* Submenu */
+.context-menu-item--has-submenu {
+  position: relative;
+  justify-content: space-between;
+}
+
+.context-menu-item--has-submenu::after {
+  content: '▶';
+  font-size: 10px;
+  color: #888;
+  margin-left: 8px;
+}
+
+.context-submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+}
+
+.context-menu-item--has-submenu:hover .context-submenu {
+  display: block;
+}

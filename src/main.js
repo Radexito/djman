@@ -56,6 +56,19 @@ ipcMain.handle('remove-track', (_, trackId) => {
   removeTrack(trackId);
   return { ok: true };
 });
+ipcMain.handle('adjust-bpm', (_, { trackIds, factor }) => {
+  const results = [];
+  for (const id of trackIds) {
+    const track = getTrackById(id);
+    if (!track) continue;
+    const base = track.bpm_override ?? track.bpm;
+    if (base == null) continue;
+    const newBpm = Math.round(base * factor * 10) / 10;
+    updateTrack(id, { bpm_override: newBpm });
+    results.push({ id, bpm_override: newBpm });
+  }
+  return results;
+});
 // ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
 ipcMain.handle('add-track', (event, track) => addTrack(track));
 // ipcMain.handle('add-track-to-playlist', (event, playlistId, trackId, order) =>
