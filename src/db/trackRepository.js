@@ -69,6 +69,14 @@ export function getTracks({ limit = 50, offset = 0, search = '' }) {
   `).all(limit, offset);
 }
 
+export function getTrackById(id) {
+  return db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
+}
+
+export function removeTrack(id) {
+  db.prepare('DELETE FROM tracks WHERE id = ?').run(id);
+}
+
 export function clearTracks() {
   console.log('Clearing all tracks from database');
   db.prepare(`DELETE FROM tracks`).run();

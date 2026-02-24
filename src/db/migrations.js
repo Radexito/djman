@@ -27,6 +27,9 @@ export function initDB() {
       key_camelot TEXT,
       energy REAL,
       loudness REAL,
+      replay_gain REAL,
+      intro_secs REAL,
+      outro_secs REAL,
 
       -- User
       rating INTEGER,
@@ -41,6 +44,15 @@ export function initDB() {
     CREATE INDEX IF NOT EXISTS idx_tracks_created_at
     ON tracks(created_at)
   `).run();
+
+  // Migrate existing databases — safe to run on fresh installs too
+  for (const col of [
+    'ALTER TABLE tracks ADD COLUMN replay_gain REAL',
+    'ALTER TABLE tracks ADD COLUMN intro_secs REAL',
+    'ALTER TABLE tracks ADD COLUMN outro_secs REAL',
+  ]) {
+    try { db.prepare(col).run(); } catch { /* column already exists */ }
+  }
 
   db.prepare(`
     CREATE INDEX IF NOT EXISTS idx_tracks_title

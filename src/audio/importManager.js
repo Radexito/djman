@@ -36,6 +36,27 @@ function parseTags(ffprobeData) {
   };
 }
 
+export function spawnAnalysis(trackId, filePath) {
+  const worker = new Worker(
+    new URL('./analysisWorker.js', import.meta.url),
+    { workerData: { filePath, trackId } }
+  );
+
+  worker.on('message', ({ ok, result, error }) => {
+    if (!ok) {
+      console.error(`Analysis failed for track ID ${trackId}:`, error);
+      return;
+    }
+    console.log(`Analysis finished for track ID ${trackId}:`, result);
+    updateTrack(trackId, result);
+
+    // Notify renderer
+    if (global.mainWindow) {
+      global.mainWindow.webContents.send('track-updated', { trackId, analysis: result });
+    }
+  });
+}
+
 export async function importAudioFile(filePath) {
   console.log(`Importing: ${filePath}`);
   const ext = path.extname(filePath);
@@ -67,21 +88,6 @@ export async function importAudioFile(filePath) {
 
   console.log(`Added track ID ${trackId}: ${title || path.basename(filePath, ext)}`);
 
-  // Background analysis
-  const worker = new Worker(
-    new URL('./analysisWorker.js', import.meta.url),
-    { workerData: { filePath: dest, trackId } } // pass trackId
-  );
-
-  worker.on('message', analysis => {
-    console.log(`Analysis finished for track ID ${trackId}:`, analysis);
-    updateTrack(trackId, analysis);
-
-    // Notify renderer
-    if (global.mainWindow) {
-      global.mainWindow.webContents.send('track-updated', { trackId, analysis });
-    }
-  });
-
+  spawnAnalysis(trackId, dest);
   return trackId;
 }
