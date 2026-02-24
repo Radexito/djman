@@ -20,14 +20,7 @@ function Sidebar({ selectedMenuItemId, onMenuSelect }) {
     if (!files.length) return;
 
     setImportProgress({ total: files.length, completed: 0 });
-
-    for (let i = 0; i < files.length; i++) {
-      const trackIds = await window.api.importAudioFiles([files[i]]);
-      if (!trackIds || !trackIds.length) continue;
-
-      setImportProgress(prev => ({ ...prev, completed: prev.completed + 1 }));
-    }
-
+    await window.api.importAudioFiles(files);
     setImportProgress({ total: 0, completed: 0 });
   };
 

@@ -26,9 +26,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('library-updated', handler);
     return () => ipcRenderer.removeListener('library-updated', handler);
   },
-  onOpenNormalize: (callback) => {
+  onOpenSettings: (callback) => {
     const handler = () => callback();
-    ipcRenderer.on('open-normalize', handler);
-    return () => ipcRenderer.removeListener('open-normalize', handler);
+    ipcRenderer.on('open-settings', handler);
+    return () => ipcRenderer.removeListener('open-settings', handler);
   },
 });

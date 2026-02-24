@@ -50,7 +50,7 @@ async function initApp() {
           label: 'Settings',
           accelerator: 'CmdOrCtrl+,',
           click: () => {
-            if (global.mainWindow) global.mainWindow.webContents.send('open-normalize');
+            if (global.mainWindow) global.mainWindow.webContents.send('open-settings');
           },
         },
       ],
@@ -69,8 +69,12 @@ ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
 ipcMain.handle('get-setting', (_, key, def) => getSetting(key, def));
 ipcMain.handle('set-setting', (_, key, value) => setSetting(key, value));
 ipcMain.handle('normalize-library', (_, { targetLufs }) => {
-  const updated = normalizeLibrary(targetLufs);
-  setSetting('normalize_target_lufs', targetLufs);
+  const parsed = Number(targetLufs);
+  if (!Number.isFinite(parsed) || parsed < -60 || parsed > 0) {
+    throw new Error(`Invalid targetLufs: must be a finite number between -60 and 0`);
+  }
+  const updated = normalizeLibrary(parsed);
+  setSetting('normalize_target_lufs', String(parsed));
   return { updated };
 });
 ipcMain.handle('reanalyze-track', (_, trackId) => {
@@ -84,6 +88,10 @@ ipcMain.handle('remove-track', (_, trackId) => {
   return { ok: true };
 });
 ipcMain.handle('adjust-bpm', (_, { trackIds, factor }) => {
+  if (factor !== 2 && factor !== 0.5) throw new Error('Invalid factor: must be 2 or 0.5');
+  if (!Array.isArray(trackIds) || trackIds.length === 0 || trackIds.length > 500) {
+    throw new Error('Invalid trackIds: must be a non-empty array of up to 500 IDs');
+  }
   const results = [];
   for (const id of trackIds) {
     const track = getTrackById(id);
