@@ -50,7 +50,7 @@ async function initApp() {
           label: 'Settings',
           accelerator: 'CmdOrCtrl+,',
           click: () => {
-            if (global.mainWindow) global.mainWindow.webContents.send('open-normalize');
+            if (global.mainWindow) global.mainWindow.webContents.send('open-settings');
           },
         },
       ],
@@ -69,8 +69,12 @@ ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
 ipcMain.handle('get-setting', (_, key, def) => getSetting(key, def));
 ipcMain.handle('set-setting', (_, key, value) => setSetting(key, value));
 ipcMain.handle('normalize-library', (_, { targetLufs }) => {
-  const updated = normalizeLibrary(targetLufs);
-  setSetting('normalize_target_lufs', targetLufs);
+  const parsed = Number(targetLufs);
+  if (!Number.isFinite(parsed) || parsed < -60 || parsed > 0) {
+    throw new Error(`Invalid targetLufs: must be a finite number between -60 and 0`);
+  }
+  const updated = normalizeLibrary(parsed);
+  setSetting('normalize_target_lufs', String(parsed));
   return { updated };
 });
 ipcMain.handle('reanalyze-track', (_, trackId) => {

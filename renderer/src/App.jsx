@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar.jsx';
 import MusicLibrary from './MusicLibrary.jsx';
-import NormalizeModal from './SettingsModal.jsx';
+import SettingsModal from './SettingsModal.jsx';
 import './App.css';
 
 function App() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('music');
-  const [showNormalize, setShowNormalize] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    const unsub = window.api.onOpenNormalize(() => setShowNormalize(true));
+    const unsub = window.api.onOpenSettings(() => setShowSettings(true));
     return unsub;
   }, []);
 
@@ -20,7 +20,7 @@ function App() {
         onMenuSelect={setSelectedPlaylistId}
       />
       <MusicLibrary selectedPlaylist={selectedPlaylistId} />
-      {showNormalize && <NormalizeModal onClose={() => setShowNormalize(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
   );
 }
