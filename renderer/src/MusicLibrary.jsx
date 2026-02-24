@@ -25,11 +25,11 @@ function MusicLibrary({ selectedPlaylist }) {
     { key: 'index', label: '#', width: '5%' },
     { key: 'title', label: 'Title', width: '30%' },
     { key: 'artist', label: 'Artist', width: '25%' },
-    { key: 'bpm', label: 'BPM', width: '8%' },
+    { key: 'bpm', label: 'BPM', width: '10%' },
     { key: 'key_camelot', label: 'Key', width: '8%' },
-    { key: 'energy', label: 'Energy', width: '8%' },
-    { key: 'loudness', label: 'Loudness', width: '8%' },
-    { key: 'status', label: 'Status', width: '8%' },
+    { key: 'loudness', label: 'Loudness', width: '10%' },
+    { key: 'replay_gain', label: 'Gain', width: '8%' },
+    { key: 'status', label: 'Status', width: '9%' },
   ];
 
   const [sortBy, setSortBy] = useState({ key: 'index', asc: true });
@@ -246,8 +246,8 @@ function MusicLibrary({ selectedPlaylist }) {
           {bpmValue ?? '...'}
         </div>
         <div className="cell numeric">{t.key_camelot ?? '...'}</div>
-        <div className="cell numeric">{t.energy ?? '...'}</div>
-        <div className="cell numeric">{t.loudness ?? '...'}</div>
+        <div className="cell numeric">{t.loudness != null ? `${t.loudness} LUFS` : '...'}</div>
+        <div className="cell numeric">{t.replay_gain != null ? `${t.replay_gain > 0 ? '+' : ''}${t.replay_gain} dB` : '...'}</div>
         <div className="cell status">{t.analyzed ? '✅' : '🔄'}</div>
       </div>
     );
@@ -270,7 +270,7 @@ function MusicLibrary({ selectedPlaylist }) {
         {columns.map(col => (
           <div
             key={col.key}
-            className={`header-cell ${['bpm','key_camelot','energy','loudness','status'].includes(col.key) ? 'right' : ''}`}
+            className={`header-cell ${['bpm','key_camelot','loudness','replay_gain','status'].includes(col.key) ? 'right' : ''}`}
             onClick={() => handleSort(col.key)}
           >
             {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
