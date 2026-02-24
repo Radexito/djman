@@ -88,6 +88,10 @@ ipcMain.handle('remove-track', (_, trackId) => {
   return { ok: true };
 });
 ipcMain.handle('adjust-bpm', (_, { trackIds, factor }) => {
+  if (factor !== 2 && factor !== 0.5) throw new Error('Invalid factor: must be 2 or 0.5');
+  if (!Array.isArray(trackIds) || trackIds.length === 0 || trackIds.length > 500) {
+    throw new Error('Invalid trackIds: must be a non-empty array of up to 500 IDs');
+  }
   const results = [];
   for (const id of trackIds) {
     const track = getTrackById(id);
