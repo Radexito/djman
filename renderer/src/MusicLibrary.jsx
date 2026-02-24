@@ -206,8 +206,9 @@ function MusicLibrary({ selectedPlaylist }) {
 
     // Persist to DB and reconcile with returned values
     const updated = await window.api.adjustBpm({ trackIds: targetIds, factor });
+    const updatedById = new Map(updated.map(r => [r.id, r]));
     setTracks(prev => prev.map(t => {
-      const u = updated.find(r => r.id === t.id);
+      const u = updatedById.get(t.id);
       return u ? { ...t, bpm_override: u.bpm_override } : t;
     }));
   }, [contextMenu]);

@@ -6,17 +6,20 @@ const DEFAULT_TARGET = -14;
 function SettingsModal({ onClose }) {
   const [activeSection, setActiveSection] = useState('library');
 
-  // Library settings
-  const [normalizeTarget, setNormalizeTarget] = useState(DEFAULT_TARGET);
+  // Library settings — keep as string locally to allow typing "-" or empty
+  const [targetInput, setTargetInput] = useState(String(DEFAULT_TARGET));
 
   useEffect(() => {
     window.api.getSetting('normalize_target_lufs', String(DEFAULT_TARGET))
-      .then(v => setNormalizeTarget(Number(v)));
+      .then(v => setTargetInput(v));
   }, []);
 
-  const handleTargetChange = async (val) => {
-    setNormalizeTarget(val);
-    await window.api.setSetting('normalize_target_lufs', String(val));
+  const handleTargetChange = (raw) => {
+    setTargetInput(raw);
+    const num = Number(raw);
+    if (Number.isFinite(num) && num >= -60 && num <= 0) {
+      window.api.setSetting('normalize_target_lufs', raw);
+    }
   };
 
   const sections = [
@@ -60,8 +63,8 @@ function SettingsModal({ onClose }) {
                       min="-30"
                       max="-6"
                       step="0.5"
-                      value={normalizeTarget}
-                      onChange={e => handleTargetChange(Number(e.target.value))}
+                      value={targetInput}
+                      onChange={e => handleTargetChange(e.target.value)}
                     />
                     <span className="settings-unit">LUFS</span>
                   </div>
