@@ -142,3 +142,11 @@ vite.config.ts.timestamp-*
 ffmpeg/
 
 library.db
+# Never commit audio/video files
+*.mp3
+*.flac
+*.wav
+*.aac
+*.m4a
+*.ogg
+*.opus
