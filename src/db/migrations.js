@@ -26,7 +26,6 @@ export function initDB() {
       bpm_override REAL,
       key_raw TEXT,
       key_camelot TEXT,
-      energy REAL,
       loudness REAL,
       replay_gain REAL,
       intro_secs REAL,
