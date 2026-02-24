@@ -4,6 +4,8 @@ A **DJ-focused music library manager** built for real DJ workflows — not a con
 
 **Stack:** Electron · React · SQLite · Python (`mixxx-analyzer`) · FFmpeg
 
+![DJ Manager screenshot](screenshot.png)
+
 ---
 
 ## Installing
@@ -112,16 +114,42 @@ npm start
 - Query builder UI (text + numeric filters, Boolean logic)
 - Key compatibility rules (Camelot wheel)
 - Saved searches / smart playlists that auto-update
+- Track context menu: **Find similar** (by BPM range, key compatibility, genre)
+- **"Play unheard"** mode — continuous playback of tracks never played, for library discovery
 
-### Stage 7 — Downloads & External Sources
-- Integration with `tidal-dl-ng-For-DJ`
-- Incoming folder with automatic analysis and review queue
+### Stage 7 — Player & Library Enhancements
+- **"Playing from: \<playlist name\>"** label in the player bar
+- **Volume control** on the speaker icon in the player bar
+- **Playback history** — recall what was playing N tracks ago (ring buffer of recent plays)
+- **Track thumbnails** (waveform preview or album art)
+- **User ratings** (star rating per track)
+- **User tagging** — freeform tags per track for custom organisation
+- **ID3 tag read/write** — full read of embedded tags on import; write-back of analysed metadata (BPM, key, replay gain) to ID3v2/Vorbis/MP4 tags
+- **Loudness equalisation** across playlists — auto-adjust gain so every track plays at a consistent LUFS target
 
-### Stage 8 — Cue Points & Set History
-- Hot cues, memory cues, loop markers
-- Set history with ordered track lists and export
+### Stage 8 — Playlist Export & DJ Software Interop
+- **M3U / M3U8 export** for universal player compatibility
+- **Rekordbox XML export** — playlists, cue points, hot cues, memory cues, beatgrid, colour tags; compatible with Pioneer CDJ / XDJ
+- **Serato export** — write Serato ID3 frames (`GEOB` tags) so cues and loops appear in Serato DJ
+- **Traktor NML export** — generate Traktor collection XML with cue points and playlist structure
+- **Hot cues, memory cues, loop markers** stored in DB and round-tripped to/from all three formats
 
-### Stage 9 — AI-Assisted Discovery
+### Stage 9 — Downloads & Ingestion
+- **yt-dlp integration** — download audio from YouTube/SoundCloud/etc. directly into the library
+- Incoming folder watcher with automatic analysis and review queue before final import
+- Source tracking (URL, platform, original quality)
+
+### Stage 10 — Distribution & CI/CD
+- **GitHub Actions workflow** to build and package for Windows, Linux (AppImage/deb), and macOS
+- Signed releases served via GitHub Releases on every version tag
+- Auto-update mechanism inside the app
+
+### Stage 11 — Radio & Discovery Mode
+- Continuous playback driven by rules (genre, BPM range, energy flow)
+- Avoid recently played tracks; maintain harmonic flow
+- Rate tracks and add to playlists during playback
+
+### Stage 12 — AI-Assisted Discovery
 - Similarity search (BPM proximity, key compatibility, genre overlap)
 - Auto set-building suggestions
 - Warm-up vs peak-time classification
