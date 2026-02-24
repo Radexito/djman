@@ -80,12 +80,28 @@ export function getTrackIds({ search = '' } = {}) {
   return db.prepare('SELECT id FROM tracks ORDER BY created_at DESC').all().map(r => r.id);
 }
 
+export function getTrackByHash(hash) {
+  return db.prepare('SELECT * FROM tracks WHERE file_hash = ?').get(hash);
+}
+
 export function getTrackById(id) {
   return db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
 }
 
 export function removeTrack(id) {
   db.prepare('DELETE FROM tracks WHERE id = ?').run(id);
+}
+
+export function normalizeLibrary(targetLufs) {
+  const tracks = db.prepare('SELECT id, loudness FROM tracks WHERE loudness IS NOT NULL').all();
+  const stmt = db.prepare('UPDATE tracks SET replay_gain = ? WHERE id = ?');
+  const run = db.transaction(() => {
+    for (const t of tracks) {
+      stmt.run(Math.round((targetLufs - t.loudness) * 10) / 10, t.id);
+    }
+  });
+  run();
+  return tracks.length;
 }
 
 export function clearTracks() {
