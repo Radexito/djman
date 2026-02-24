@@ -23,9 +23,9 @@ export function initDB() {
 
       -- Analysis
       bpm REAL,
+      bpm_override REAL,
       key_raw TEXT,
       key_camelot TEXT,
-      energy REAL,
       loudness REAL,
       replay_gain REAL,
       intro_secs REAL,
@@ -47,6 +47,7 @@ export function initDB() {
 
   // Migrate existing databases — safe to run on fresh installs too
   for (const col of [
+    'ALTER TABLE tracks ADD COLUMN bpm_override REAL',
     'ALTER TABLE tracks ADD COLUMN replay_gain REAL',
     'ALTER TABLE tracks ADD COLUMN intro_secs REAL',
     'ALTER TABLE tracks ADD COLUMN outro_secs REAL',
@@ -78,6 +79,13 @@ export function initDB() {
       track_id INTEGER NOT NULL,
       track_order INTEGER NOT NULL,
       PRIMARY KEY (playlist_id, track_id)
+    )
+  `).run();
+
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     )
   `).run();
 }

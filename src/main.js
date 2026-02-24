@@ -1,9 +1,10 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { initDB } from './db/migrations.js';
 // import { createPlaylist, addTrackToPlaylist, getPlaylistTracks } from './db/playlistRepository.js';
-import { addTrack, getTracks, getTrackById, removeTrack } from './db/trackRepository.js';
+import { addTrack, getTracks, getTrackIds, getTrackById, removeTrack, updateTrack, normalizeLibrary } from './db/trackRepository.js';
+import { getSetting, setSetting } from './db/settingsRepository.js';
 import { importAudioFile, spawnAnalysis } from './audio/importManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,24 @@ async function initApp() {
   console.log('Creating window.');
   createWindow();
 
+  // Application menu
+  const menu = Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'Edit',
+      submenu: [
+        {
+          label: 'Settings',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => {
+            if (global.mainWindow) global.mainWindow.webContents.send('open-normalize');
+          },
+        },
+      ],
+    },
+  ]);
+  Menu.setApplicationMenu(menu);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -46,6 +65,14 @@ async function initApp() {
 
 // IPC Handlers
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
+ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
+ipcMain.handle('get-setting', (_, key, def) => getSetting(key, def));
+ipcMain.handle('set-setting', (_, key, value) => setSetting(key, value));
+ipcMain.handle('normalize-library', (_, { targetLufs }) => {
+  const updated = normalizeLibrary(targetLufs);
+  setSetting('normalize_target_lufs', targetLufs);
+  return { updated };
+});
 ipcMain.handle('reanalyze-track', (_, trackId) => {
   const track = getTrackById(trackId);
   if (!track) throw new Error(`Track ${trackId} not found`);
@@ -55,6 +82,19 @@ ipcMain.handle('reanalyze-track', (_, trackId) => {
 ipcMain.handle('remove-track', (_, trackId) => {
   removeTrack(trackId);
   return { ok: true };
+});
+ipcMain.handle('adjust-bpm', (_, { trackIds, factor }) => {
+  const results = [];
+  for (const id of trackIds) {
+    const track = getTrackById(id);
+    if (!track) continue;
+    const base = track.bpm_override ?? track.bpm;
+    if (base == null) continue;
+    const newBpm = Math.round(base * factor * 10) / 10;
+    updateTrack(id, { bpm_override: newBpm });
+    results.push({ id, bpm_override: newBpm });
+  }
+  return results;
 });
 // ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
 ipcMain.handle('add-track', (event, track) => addTrack(track));
@@ -84,6 +124,10 @@ ipcMain.handle('import-audio-files', async (event, filePaths) => {
     } catch (err) {
       console.error('Import failed:', filePath, err);
     }
+  }
+
+  if (trackIds.length > 0 && global.mainWindow) {
+    global.mainWindow.webContents.send('library-updated');
   }
 
   return trackIds;
