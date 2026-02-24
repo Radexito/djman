@@ -3,8 +3,8 @@ import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { initDB } from './db/migrations.js';
 // import { createPlaylist, addTrackToPlaylist, getPlaylistTracks } from './db/playlistRepository.js';
-import { addTrack, getTracks } from './db/trackRepository.js';
-import { importAudioFile } from './audio/importManager.js';
+import { addTrack, getTracks, getTrackById, removeTrack } from './db/trackRepository.js';
+import { importAudioFile, spawnAnalysis } from './audio/importManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +46,16 @@ async function initApp() {
 
 // IPC Handlers
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
+ipcMain.handle('reanalyze-track', (_, trackId) => {
+  const track = getTrackById(trackId);
+  if (!track) throw new Error(`Track ${trackId} not found`);
+  spawnAnalysis(trackId, track.file_path);
+  return { ok: true };
+});
+ipcMain.handle('remove-track', (_, trackId) => {
+  removeTrack(trackId);
+  return { ok: true };
+});
 // ipcMain.handle('create-playlist', (event, name) => createPlaylist(name));
 ipcMain.handle('add-track', (event, track) => addTrack(track));
 // ipcMain.handle('add-track-to-playlist', (event, playlistId, trackId, order) =>

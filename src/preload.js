@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld('api', {
   getPlaylistTracks: (playlistId) => ipcRenderer.invoke('get-playlist-tracks', playlistId),
   selectAudioFiles: () => ipcRenderer.invoke('select-audio-files'),
   importAudioFiles: (files) => ipcRenderer.invoke('import-audio-files', files),
-  onTrackUpdated: (callback) => ipcRenderer.on('track-updated', (event, data) => callback(data)),
   getTracks: (params) => ipcRenderer.invoke('get-tracks', params),
+  reanalyzeTrack: (trackId) => ipcRenderer.invoke('reanalyze-track', trackId),
+  removeTrack: (trackId) => ipcRenderer.invoke('remove-track', trackId),
+  onTrackUpdated: (callback) => {
+    const handler = (_, data) => callback(data);
+    ipcRenderer.on('track-updated', handler);
+    return () => ipcRenderer.removeListener('track-updated', handler);
+  },
 });

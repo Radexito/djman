@@ -1,0 +1,6 @@
+3rdparty
+algorithms
+essentia
+examples
+name
+python

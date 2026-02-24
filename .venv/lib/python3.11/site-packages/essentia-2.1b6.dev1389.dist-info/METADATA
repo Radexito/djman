@@ -1,0 +1,44 @@
+Metadata-Version: 2.4
+Name: essentia
+Version: 2.1b6.dev1389
+Summary: Library for audio and music analysis, description and synthesis
+Home-page: http://essentia.upf.edu
+Author: Dmitry Bogdanov
+Author-email: dmitry.bogdanov@upf.edu
+License-Expression: AGPL-3.0-only
+Project-URL: Documentation, http://essentia.upf.edu
+Project-URL: Source Code, https://github.com/MTG/essentia
+Keywords: audio music sound dsp MIR
+Platform: any
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Multimedia :: Sound/Audio :: Analysis
+Classifier: Topic :: Multimedia :: Sound/Audio :: Sound Synthesis
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Programming Language :: C++
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 3
+License-File: COPYING.txt
+License-File: AUTHORS
+Requires-Dist: numpy>=1.25
+Requires-Dist: pyyaml
+Requires-Dist: six
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license-file
+Dynamic: platform
+Dynamic: project-url
+Dynamic: summary
+
+
+Essentia is an open-source C++ library with Python bindings for audio analysis and audio-based music information retrieval. It contains an extensive collection of algorithms, including audio input/output functionality, standard digital signal processing blocks, statistical characterization of data, a large variety of spectral, temporal, tonal, and high-level music descriptors, and tools for inference with deep learning models. Designed with a focus on optimization in terms of robustness, computational speed, low memory usage, as well as flexibility, it is efficient for many industrial applications and allows fast prototyping and setting up research experiments very rapidly.
+
+Website: https://essentia.upf.edu

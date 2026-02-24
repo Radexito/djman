@@ -11,6 +11,7 @@ function MusicLibrary({ selectedPlaylist }) {
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, track }
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
@@ -74,6 +75,42 @@ function MusicLibrary({ selectedPlaylist }) {
     loadTracks();
   }, [search, selectedPlaylist]);
 
+  // Listen for background analysis updates
+  useEffect(() => {
+    const unsub = window.api.onTrackUpdated(({ trackId, analysis }) => {
+      setTracks(prev => prev.map(t =>
+        t.id === trackId ? { ...t, ...analysis, analyzed: 1 } : t
+      ));
+    });
+    return unsub;
+  }, []);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [contextMenu]);
+
+  const handleContextMenu = useCallback((e, track) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, track });
+  }, []);
+
+  const handleReanalyze = useCallback(async (track) => {
+    setContextMenu(null);
+    setTracks(prev => prev.map(t => t.id === track.id ? { ...t, analyzed: 0 } : t));
+    await window.api.reanalyzeTrack(track.id);
+  }, []);
+
+  const handleRemove = useCallback(async (track) => {
+    setContextMenu(null);
+    await window.api.removeTrack(track.id);
+    setTracks(prev => prev.filter(t => t.id !== track.id));
+    offsetRef.current = Math.max(0, offsetRef.current - 1);
+  }, []);
+
   const handleItemsRendered = useCallback(({ visibleStopIndex }) => {
     if (
       visibleStopIndex >= sortedTracksRef.current.length - PRELOAD_TRIGGER &&
@@ -107,6 +144,7 @@ function MusicLibrary({ selectedPlaylist }) {
         style={style}
         className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}`}
         title={`${t.title} - ${t.artist || 'Unknown'}`}
+        onContextMenu={(e) => handleContextMenu(e, t)}
       >
         <div className="cell index">{index + 1}</div>
         <div className="cell title">{t.title}</div>
@@ -152,6 +190,25 @@ function MusicLibrary({ selectedPlaylist }) {
       >
         {Row}
       </List>
+
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-item" onClick={() => handleReanalyze(contextMenu.track)}>
+            🔄 Re-analyze
+          </div>
+          <div className="context-menu-item context-menu-item--danger" onClick={() => handleRemove(contextMenu.track)}>
+            🗑️ Remove
+          </div>
+          <div className="context-menu-separator" />
+          <div className="context-menu-item context-menu-item--disabled">
+            ➕ Add to playlist
+          </div>
+        </div>
+      )}
     </div>
   );
 }
