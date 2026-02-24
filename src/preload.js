@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   getTracks: (params) => ipcRenderer.invoke('get-tracks', params),
   reanalyzeTrack: (trackId) => ipcRenderer.invoke('reanalyze-track', trackId),
   removeTrack: (trackId) => ipcRenderer.invoke('remove-track', trackId),
+  adjustBpm: (payload) => ipcRenderer.invoke('adjust-bpm', payload),
   onTrackUpdated: (callback) => {
     const handler = (_, data) => callback(data);
     ipcRenderer.on('track-updated', handler);

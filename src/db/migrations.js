@@ -23,6 +23,7 @@ export function initDB() {
 
       -- Analysis
       bpm REAL,
+      bpm_override REAL,
       key_raw TEXT,
       key_camelot TEXT,
       energy REAL,
@@ -47,6 +48,7 @@ export function initDB() {
 
   // Migrate existing databases — safe to run on fresh installs too
   for (const col of [
+    'ALTER TABLE tracks ADD COLUMN bpm_override REAL',
     'ALTER TABLE tracks ADD COLUMN replay_gain REAL',
     'ALTER TABLE tracks ADD COLUMN intro_secs REAL',
     'ALTER TABLE tracks ADD COLUMN outro_secs REAL',

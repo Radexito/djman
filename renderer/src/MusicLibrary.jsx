@@ -11,12 +11,14 @@ function MusicLibrary({ selectedPlaylist }) {
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [contextMenu, setContextMenu] = useState(null); // { x, y, track }
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, targetIds }
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
   const listRef = useRef();
   const sortedTracksRef = useRef([]);
+  const lastSelectedIndexRef = useRef(null);
 
   const columns = [
     { key: 'index', label: '#', width: '5%' },
@@ -72,6 +74,8 @@ function MusicLibrary({ selectedPlaylist }) {
     offsetRef.current = 0;
     setTracks([]);
     setHasMore(true);
+    setSelectedIds(new Set());
+    lastSelectedIndexRef.current = null;
     loadTracks();
   }, [search, selectedPlaylist]);
 
@@ -93,23 +97,82 @@ function MusicLibrary({ selectedPlaylist }) {
     return () => document.removeEventListener('mousedown', close);
   }, [contextMenu]);
 
-  const handleContextMenu = useCallback((e, track) => {
+  // ── Selection ──────────────────────────────────────────────────────────────
+
+  const handleRowClick = useCallback((e, track, index) => {
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(track.id)) next.delete(track.id);
+        else next.add(track.id);
+        return next;
+      });
+      lastSelectedIndexRef.current = index;
+    } else if (e.shiftKey && lastSelectedIndexRef.current !== null) {
+      const start = Math.min(lastSelectedIndexRef.current, index);
+      const end   = Math.max(lastSelectedIndexRef.current, index);
+      const rangeIds = sortedTracksRef.current.slice(start, end + 1).map(t => t.id);
+      setSelectedIds(new Set(rangeIds));
+    } else {
+      setSelectedIds(new Set([track.id]));
+      lastSelectedIndexRef.current = index;
+    }
+  }, []);
+
+  // ── Context menu ───────────────────────────────────────────────────────────
+
+  const handleContextMenu = useCallback((e, track, index) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, track });
-  }, []);
+    // If right-clicked track is already selected, menu targets all selected
+    // Otherwise, select only this track
+    if (!selectedIds.has(track.id)) {
+      setSelectedIds(new Set([track.id]));
+      lastSelectedIndexRef.current = index;
+    }
+    const targetIds = selectedIds.has(track.id) ? [...selectedIds] : [track.id];
+    setContextMenu({ x: e.clientX, y: e.clientY, targetIds });
+  }, [selectedIds]);
 
-  const handleReanalyze = useCallback(async (track) => {
+  const handleReanalyze = useCallback(async () => {
+    const targetIds = contextMenu?.targetIds ?? [];
     setContextMenu(null);
-    setTracks(prev => prev.map(t => t.id === track.id ? { ...t, analyzed: 0 } : t));
-    await window.api.reanalyzeTrack(track.id);
-  }, []);
+    setTracks(prev => prev.map(t =>
+      targetIds.includes(t.id) ? { ...t, analyzed: 0 } : t
+    ));
+    for (const id of targetIds) await window.api.reanalyzeTrack(id);
+  }, [contextMenu]);
 
-  const handleRemove = useCallback(async (track) => {
+  const handleRemove = useCallback(async () => {
+    const targetIds = contextMenu?.targetIds ?? [];
     setContextMenu(null);
-    await window.api.removeTrack(track.id);
-    setTracks(prev => prev.filter(t => t.id !== track.id));
-    offsetRef.current = Math.max(0, offsetRef.current - 1);
-  }, []);
+    for (const id of targetIds) await window.api.removeTrack(id);
+    setTracks(prev => prev.filter(t => !targetIds.includes(t.id)));
+    setSelectedIds(new Set());
+    offsetRef.current = Math.max(0, offsetRef.current - targetIds.length);
+  }, [contextMenu]);
+
+  const handleBpmAdjust = useCallback(async (factor) => {
+    const targetIds = contextMenu?.targetIds ?? [];
+    setContextMenu(null);
+    if (!targetIds.length) return;
+
+    // Optimistic update
+    setTracks(prev => prev.map(t => {
+      if (!targetIds.includes(t.id)) return t;
+      const base = t.bpm_override ?? t.bpm;
+      if (base == null) return t;
+      return { ...t, bpm_override: Math.round(base * factor * 10) / 10 };
+    }));
+
+    // Persist to DB and reconcile with returned values
+    const updated = await window.api.adjustBpm({ trackIds: targetIds, factor });
+    setTracks(prev => prev.map(t => {
+      const u = updated.find(r => r.id === t.id);
+      return u ? { ...t, bpm_override: u.bpm_override } : t;
+    }));
+  }, [contextMenu]);
+
+  // ── Misc ───────────────────────────────────────────────────────────────────
 
   const handleItemsRendered = useCallback(({ visibleStopIndex }) => {
     if (
@@ -128,6 +191,8 @@ function MusicLibrary({ selectedPlaylist }) {
     }));
   }, []);
 
+  // ── Row ────────────────────────────────────────────────────────────────────
+
   const Row = ({ index, style }) => {
     const t = sortedTracksRef.current[index];
 
@@ -139,17 +204,23 @@ function MusicLibrary({ selectedPlaylist }) {
       );
     }
 
+    const isSelected = selectedIds.has(t.id);
+    const bpmValue   = t.bpm_override ?? t.bpm;
+
     return (
       <div
         style={style}
-        className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}`}
+        className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}${isSelected ? ' row--selected' : ''}`}
         title={`${t.title} - ${t.artist || 'Unknown'}`}
-        onContextMenu={(e) => handleContextMenu(e, t)}
+        onClick={(e) => handleRowClick(e, t, index)}
+        onContextMenu={(e) => handleContextMenu(e, t, index)}
       >
         <div className="cell index">{index + 1}</div>
         <div className="cell title">{t.title}</div>
         <div className="cell artist">{t.artist || 'Unknown'}</div>
-        <div className="cell numeric">{t.bpm ?? '...'}</div>
+        <div className={`cell numeric${t.bpm_override != null ? ' bpm--overridden' : ''}`}>
+          {bpmValue ?? '...'}
+        </div>
         <div className="cell numeric">{t.key_camelot ?? '...'}</div>
         <div className="cell numeric">{t.energy ?? '...'}</div>
         <div className="cell numeric">{t.loudness ?? '...'}</div>
@@ -157,6 +228,10 @@ function MusicLibrary({ selectedPlaylist }) {
       </div>
     );
   };
+
+  const selectionLabel = contextMenu?.targetIds?.length > 1
+    ? ` (${contextMenu.targetIds.length} tracks)`
+    : '';
 
   return (
     <div className="music-library">
@@ -197,11 +272,22 @@ function MusicLibrary({ selectedPlaylist }) {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="context-menu-item" onClick={() => handleReanalyze(contextMenu.track)}>
-            🔄 Re-analyze
+          <div className="context-menu-item" onClick={handleReanalyze}>
+            🔄 Re-analyze{selectionLabel}
           </div>
-          <div className="context-menu-item context-menu-item--danger" onClick={() => handleRemove(contextMenu.track)}>
-            🗑️ Remove
+          <div className="context-menu-item context-menu-item--has-submenu">
+            🎵 BPM{selectionLabel}
+            <div className="context-submenu">
+              <div className="context-menu-item" onClick={() => handleBpmAdjust(2)}>
+                ✕2 Double BPM
+              </div>
+              <div className="context-menu-item" onClick={() => handleBpmAdjust(0.5)}>
+                ÷2 Halve BPM
+              </div>
+            </div>
+          </div>
+          <div className="context-menu-item context-menu-item--danger" onClick={handleRemove}>
+            🗑️ Remove{selectionLabel}
           </div>
           <div className="context-menu-separator" />
           <div className="context-menu-item context-menu-item--disabled">
@@ -214,3 +300,4 @@ function MusicLibrary({ selectedPlaylist }) {
 }
 
 export default MusicLibrary;
+
