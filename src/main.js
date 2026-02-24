@@ -46,21 +46,15 @@ async function initApp() {
     {
       label: 'Edit',
       submenu: [
-        { role: 'undo' }, { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
-        { type: 'separator' },
         {
-          label: 'Normalize Library…',
-          accelerator: 'CmdOrCtrl+Shift+N',
+          label: 'Settings',
+          accelerator: 'CmdOrCtrl+,',
           click: () => {
             if (global.mainWindow) global.mainWindow.webContents.send('open-normalize');
           },
         },
       ],
     },
-    { role: 'viewMenu' },
-    { role: 'windowMenu' },
   ]);
   Menu.setApplicationMenu(menu);
 

@@ -27,7 +27,7 @@ function MusicLibrary({ selectedPlaylist }) {
     { key: 'artist',     label: 'Artist',   width: '28%' },
     { key: 'bpm',        label: 'BPM',      width: '10%' },
     { key: 'key_camelot',label: 'Key',      width: '8%'  },
-    { key: 'loudness',   label: 'Loudness', width: '14%' },
+    { key: 'loudness',   label: 'Loudness (LUFS)', width: '14%' },
   ];
 
   const [sortBy, setSortBy] = useState({ key: 'index', asc: true });
@@ -253,7 +253,7 @@ function MusicLibrary({ selectedPlaylist }) {
           {bpmValue ?? '...'}
         </div>
         <div className="cell numeric">{t.key_camelot ?? '...'}</div>
-        <div className="cell numeric">{t.loudness != null ? `${t.loudness} LUFS` : '...'}</div>
+        <div className="cell numeric">{t.loudness != null ? t.loudness : '...'}</div>
       </div>
     );
   };
