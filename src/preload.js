@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('api', {
   importAudioFiles: (files) => ipcRenderer.invoke('import-audio-files', files),
   getTracks: (params) => ipcRenderer.invoke('get-tracks', params),
   getTrackIds: (params) => ipcRenderer.invoke('get-track-ids', params),
+  getSetting: (key, def) => ipcRenderer.invoke('get-setting', key, def),
+  setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
+  normalizeLibrary: (payload) => ipcRenderer.invoke('normalize-library', payload),
   reanalyzeTrack: (trackId) => ipcRenderer.invoke('reanalyze-track', trackId),
   removeTrack: (trackId) => ipcRenderer.invoke('remove-track', trackId),
   adjustBpm: (payload) => ipcRenderer.invoke('adjust-bpm', payload),
@@ -22,5 +25,10 @@ contextBridge.exposeInMainWorld('api', {
     const handler = () => callback();
     ipcRenderer.on('library-updated', handler);
     return () => ipcRenderer.removeListener('library-updated', handler);
+  },
+  onOpenNormalize: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('open-normalize', handler);
+    return () => ipcRenderer.removeListener('open-normalize', handler);
   },
 });

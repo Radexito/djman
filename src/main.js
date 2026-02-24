@@ -1,9 +1,10 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { initDB } from './db/migrations.js';
 // import { createPlaylist, addTrackToPlaylist, getPlaylistTracks } from './db/playlistRepository.js';
-import { addTrack, getTracks, getTrackIds, getTrackById, removeTrack } from './db/trackRepository.js';
+import { addTrack, getTracks, getTrackIds, getTrackById, removeTrack, updateTrack, normalizeLibrary } from './db/trackRepository.js';
+import { getSetting, setSetting } from './db/settingsRepository.js';
 import { importAudioFile, spawnAnalysis } from './audio/importManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,30 @@ async function initApp() {
   console.log('Creating window.');
   createWindow();
 
+  // Application menu
+  const menu = Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' }, { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
+        { type: 'separator' },
+        {
+          label: 'Normalize Library…',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => {
+            if (global.mainWindow) global.mainWindow.webContents.send('open-normalize');
+          },
+        },
+      ],
+    },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ]);
+  Menu.setApplicationMenu(menu);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -47,6 +72,13 @@ async function initApp() {
 // IPC Handlers
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
 ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
+ipcMain.handle('get-setting', (_, key, def) => getSetting(key, def));
+ipcMain.handle('set-setting', (_, key, value) => setSetting(key, value));
+ipcMain.handle('normalize-library', (_, { targetLufs }) => {
+  const updated = normalizeLibrary(targetLufs);
+  setSetting('normalize_target_lufs', targetLufs);
+  return { updated };
+});
 ipcMain.handle('reanalyze-track', (_, trackId) => {
   const track = getTrackById(trackId);
   if (!track) throw new Error(`Track ${trackId} not found`);

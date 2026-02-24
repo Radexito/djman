@@ -81,4 +81,11 @@ export function initDB() {
       PRIMARY KEY (playlist_id, track_id)
     )
   `).run();
+
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `).run();
 }

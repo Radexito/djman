@@ -9,7 +9,6 @@ const PRELOAD_TRIGGER = 3;
 function MusicLibrary({ selectedPlaylist }) {
   const [tracks, setTracks] = useState([]);
   const [hasMore, setHasMore] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [contextMenu, setContextMenu] = useState(null); // { x, y, targetIds }
@@ -17,28 +16,26 @@ function MusicLibrary({ selectedPlaylist }) {
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);    // ref copy of hasMore — avoids stale closures in loadTracks
   const listRef = useRef();
   const sortedTracksRef = useRef([]);
   const lastSelectedIndexRef = useRef(null);
 
   const columns = [
-    { key: 'index', label: '#', width: '5%' },
-    { key: 'title', label: 'Title', width: '30%' },
-    { key: 'artist', label: 'Artist', width: '25%' },
-    { key: 'bpm', label: 'BPM', width: '10%' },
-    { key: 'key_camelot', label: 'Key', width: '8%' },
-    { key: 'loudness', label: 'Loudness', width: '10%' },
-    { key: 'replay_gain', label: 'Gain', width: '8%' },
-    { key: 'status', label: 'Status', width: '9%' },
+    { key: 'index',      label: '#',        width: '5%'  },
+    { key: 'title',      label: 'Title',    width: '35%' },
+    { key: 'artist',     label: 'Artist',   width: '28%' },
+    { key: 'bpm',        label: 'BPM',      width: '10%' },
+    { key: 'key_camelot',label: 'Key',      width: '8%'  },
+    { key: 'loudness',   label: 'Loudness', width: '14%' },
   ];
 
   const [sortBy, setSortBy] = useState({ key: 'index', asc: true });
 
   const loadTracks = useCallback(async () => {
-    if (loadingRef.current || !hasMore || isLoading) return;
+    if (loadingRef.current || !hasMoreRef.current) return;
 
     loadingRef.current = true;
-    setIsLoading(true);
 
     try {
       const rows = await window.api.getTracks({
@@ -51,12 +48,14 @@ function MusicLibrary({ selectedPlaylist }) {
       setTracks(prev => [...prev, ...rows]);
       offsetRef.current += rows.length;
 
-      if (rows.length < PAGE_SIZE) setHasMore(false);
+      if (rows.length < PAGE_SIZE) {
+        hasMoreRef.current = false;
+        setHasMore(false);
+      }
     } finally {
       loadingRef.current = false;
-      setIsLoading(false);
     }
-  }, [search, selectedPlaylist, hasMore, isLoading]);
+  }, [search, selectedPlaylist]); // no hasMore in deps — we use hasMoreRef
 
   const sortedTracks = useMemo(() => {
     const sorted = [...tracks].sort((a, b) => {
@@ -74,12 +73,24 @@ function MusicLibrary({ selectedPlaylist }) {
   useEffect(() => {
     offsetRef.current = 0;
     loadingRef.current = false;
+    hasMoreRef.current = true;
     setTracks([]);
     setHasMore(true);
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = null;
-    loadTracks();
-  }, [search, selectedPlaylist, loadKey]);
+
+    // Use setTimeout so the state updates above are committed before we load.
+    // The cleanup cancels the timer — in StrictMode this means the first
+    // invocation's timer is always cancelled, leaving only one load per reset.
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (!cancelled) loadTracks();
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, selectedPlaylist, loadKey, loadTracks]);
 
   // Listen for background analysis updates
   useEffect(() => {
@@ -199,14 +210,10 @@ function MusicLibrary({ selectedPlaylist }) {
   // ── Misc ───────────────────────────────────────────────────────────────────
 
   const handleItemsRendered = useCallback(({ visibleStopIndex }) => {
-    if (
-      visibleStopIndex >= sortedTracksRef.current.length - PRELOAD_TRIGGER &&
-      hasMore &&
-      !loadingRef.current
-    ) {
-      loadTracks();
+    if (visibleStopIndex >= sortedTracksRef.current.length - PRELOAD_TRIGGER) {
+      loadTracks(); // loadTracks checks hasMoreRef and loadingRef internally
     }
-  }, [hasMore, loadTracks]);
+  }, [loadTracks]);
 
   const handleSort = useCallback((key) => {
     setSortBy(prev => ({
@@ -247,8 +254,6 @@ function MusicLibrary({ selectedPlaylist }) {
         </div>
         <div className="cell numeric">{t.key_camelot ?? '...'}</div>
         <div className="cell numeric">{t.loudness != null ? `${t.loudness} LUFS` : '...'}</div>
-        <div className="cell numeric">{t.replay_gain != null ? `${t.replay_gain > 0 ? '+' : ''}${t.replay_gain} dB` : '...'}</div>
-        <div className="cell status">{t.analyzed ? '✅' : '🔄'}</div>
       </div>
     );
   };
@@ -270,7 +275,7 @@ function MusicLibrary({ selectedPlaylist }) {
         {columns.map(col => (
           <div
             key={col.key}
-            className={`header-cell ${['bpm','key_camelot','loudness','replay_gain','status'].includes(col.key) ? 'right' : ''}`}
+            className={`header-cell ${['bpm','key_camelot','loudness'].includes(col.key) ? 'right' : ''}`}
             onClick={() => handleSort(col.key)}
           >
             {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
