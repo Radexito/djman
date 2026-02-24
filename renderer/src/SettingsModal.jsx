@@ -8,19 +8,15 @@ function SettingsModal({ onClose }) {
 
   // Library settings
   const [normalizeTarget, setNormalizeTarget] = useState(DEFAULT_TARGET);
-  const [normalizeStatus, setNormalizeStatus] = useState('idle'); // idle | loading | done
-  const [normalizeCount, setNormalizeCount] = useState(0);
 
   useEffect(() => {
     window.api.getSetting('normalize_target_lufs', String(DEFAULT_TARGET))
       .then(v => setNormalizeTarget(Number(v)));
   }, []);
 
-  const handleNormalize = async () => {
-    setNormalizeStatus('loading');
-    const { updated } = await window.api.normalizeLibrary({ targetLufs: normalizeTarget });
-    setNormalizeCount(updated);
-    setNormalizeStatus('done');
+  const handleTargetChange = async (val) => {
+    setNormalizeTarget(val);
+    await window.api.setSetting('normalize_target_lufs', String(val));
   };
 
   const sections = [
@@ -65,25 +61,10 @@ function SettingsModal({ onClose }) {
                       max="-6"
                       step="0.5"
                       value={normalizeTarget}
-                      onChange={e => setNormalizeTarget(Number(e.target.value))}
-                      disabled={normalizeStatus === 'loading'}
+                      onChange={e => handleTargetChange(Number(e.target.value))}
                     />
                     <span className="settings-unit">LUFS</span>
                   </div>
-                </div>
-                <div className="settings-action-row">
-                  {normalizeStatus === 'done' && (
-                    <span className="settings-success">
-                      ✓ Updated {normalizeCount} track{normalizeCount !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                  <button
-                    className="btn-primary"
-                    onClick={handleNormalize}
-                    disabled={normalizeStatus === 'loading'}
-                  >
-                    {normalizeStatus === 'loading' ? 'Normalizing…' : 'Normalize All'}
-                  </button>
                 </div>
               </div>
             </>
