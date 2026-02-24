@@ -69,6 +69,17 @@ export function getTracks({ limit = 50, offset = 0, search = '' }) {
   `).all(limit, offset);
 }
 
+export function getTrackIds({ search = '' } = {}) {
+  if (search) {
+    return db.prepare(`
+      SELECT id FROM tracks
+      WHERE title LIKE @q OR artist LIKE @q OR album LIKE @q
+      ORDER BY created_at DESC
+    `).all({ q: `%${search}%` }).map(r => r.id);
+  }
+  return db.prepare('SELECT id FROM tracks ORDER BY created_at DESC').all().map(r => r.id);
+}
+
 export function getTrackById(id) {
   return db.prepare('SELECT * FROM tracks WHERE id = ?').get(id);
 }
