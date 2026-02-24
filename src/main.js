@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { initDB } from './db/migrations.js';
 // import { createPlaylist, addTrackToPlaylist, getPlaylistTracks } from './db/playlistRepository.js';
-import { addTrack, getTracks, getTrackById, removeTrack } from './db/trackRepository.js';
+import { addTrack, getTracks, getTrackIds, getTrackById, removeTrack } from './db/trackRepository.js';
 import { importAudioFile, spawnAnalysis } from './audio/importManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +46,7 @@ async function initApp() {
 
 // IPC Handlers
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
+ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
 ipcMain.handle('reanalyze-track', (_, trackId) => {
   const track = getTrackById(trackId);
   if (!track) throw new Error(`Track ${trackId} not found`);
@@ -97,6 +98,10 @@ ipcMain.handle('import-audio-files', async (event, filePaths) => {
     } catch (err) {
       console.error('Import failed:', filePath, err);
     }
+  }
+
+  if (trackIds.length > 0 && global.mainWindow) {
+    global.mainWindow.webContents.send('library-updated');
   }
 
   return trackIds;

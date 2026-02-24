@@ -13,6 +13,7 @@ function MusicLibrary({ selectedPlaylist }) {
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [contextMenu, setContextMenu] = useState(null); // { x, y, targetIds }
+  const [loadKey, setLoadKey] = useState(0);
 
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
@@ -72,12 +73,13 @@ function MusicLibrary({ selectedPlaylist }) {
 
   useEffect(() => {
     offsetRef.current = 0;
+    loadingRef.current = false;
     setTracks([]);
     setHasMore(true);
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = null;
     loadTracks();
-  }, [search, selectedPlaylist]);
+  }, [search, selectedPlaylist, loadKey]);
 
   // Listen for background analysis updates
   useEffect(() => {
@@ -88,6 +90,28 @@ function MusicLibrary({ selectedPlaylist }) {
     });
     return unsub;
   }, []);
+
+  // Refresh list when new tracks are imported
+  useEffect(() => {
+    const unsub = window.api.onLibraryUpdated(() => setLoadKey(k => k + 1));
+    return unsub;
+  }, []);
+
+  // Ctrl+A — select all tracks including unloaded ones
+  useEffect(() => {
+    const onKeyDown = async (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        const ids = await window.api.getTrackIds({
+          search,
+          playlistId: selectedPlaylist !== 'music' ? selectedPlaylist : undefined,
+        });
+        setSelectedIds(new Set(ids));
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [search, selectedPlaylist]);
 
   // Close context menu on outside click
   useEffect(() => {
