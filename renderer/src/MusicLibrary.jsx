@@ -17,6 +17,7 @@ function MusicLibrary({ selectedPlaylist }) {
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);    // ref copy of hasMore — avoids stale closures in loadTracks
+  const resetTokenRef = useRef(0);    // incremented on every reset; stale fetches compare and discard
   const listRef = useRef();
   const sortedTracksRef = useRef([]);
   const lastSelectedIndexRef = useRef(null);
@@ -36,6 +37,7 @@ function MusicLibrary({ selectedPlaylist }) {
     if (loadingRef.current || !hasMoreRef.current) return;
 
     loadingRef.current = true;
+    const token = resetTokenRef.current;
 
     try {
       const rows = await window.api.getTracks({
@@ -45,6 +47,8 @@ function MusicLibrary({ selectedPlaylist }) {
         playlistId: selectedPlaylist !== 'music' ? selectedPlaylist : undefined,
       });
 
+      if (token !== resetTokenRef.current) return; // stale — reset happened mid-flight
+
       setTracks(prev => [...prev, ...rows]);
       offsetRef.current += rows.length;
 
@@ -53,7 +57,7 @@ function MusicLibrary({ selectedPlaylist }) {
         setHasMore(false);
       }
     } finally {
-      loadingRef.current = false;
+      if (token === resetTokenRef.current) loadingRef.current = false;
     }
   }, [search, selectedPlaylist]); // no hasMore in deps — we use hasMoreRef
 
@@ -74,6 +78,7 @@ function MusicLibrary({ selectedPlaylist }) {
     offsetRef.current = 0;
     loadingRef.current = false;
     hasMoreRef.current = true;
+    resetTokenRef.current += 1;
     setTracks([]);
     setHasMore(true);
     setSelectedIds(new Set());
@@ -201,8 +206,9 @@ function MusicLibrary({ selectedPlaylist }) {
 
     // Persist to DB and reconcile with returned values
     const updated = await window.api.adjustBpm({ trackIds: targetIds, factor });
+    const updatedById = new Map(updated.map(r => [r.id, r]));
     setTracks(prev => prev.map(t => {
-      const u = updated.find(r => r.id === t.id);
+      const u = updatedById.get(t.id);
       return u ? { ...t, bpm_override: u.bpm_override } : t;
     }));
   }, [contextMenu]);

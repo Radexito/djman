@@ -52,6 +52,7 @@
   padding: 0 8px;
   cursor: pointer;
   color: #e0e0e0;
+  user-select: none;
 }
 
 .row-even {

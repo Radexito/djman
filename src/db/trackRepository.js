@@ -93,15 +93,12 @@ export function removeTrack(id) {
 }
 
 export function normalizeLibrary(targetLufs) {
-  const tracks = db.prepare('SELECT id, loudness FROM tracks WHERE loudness IS NOT NULL').all();
-  const stmt = db.prepare('UPDATE tracks SET replay_gain = ? WHERE id = ?');
-  const run = db.transaction(() => {
-    for (const t of tracks) {
-      stmt.run(Math.round((targetLufs - t.loudness) * 10) / 10, t.id);
-    }
-  });
-  run();
-  return tracks.length;
+  const info = db.prepare(`
+    UPDATE tracks
+    SET replay_gain = ROUND((? - loudness) * 10) / 10
+    WHERE loudness IS NOT NULL
+  `).run(targetLufs);
+  return info.changes ?? 0;
 }
 
 export function clearTracks() {
