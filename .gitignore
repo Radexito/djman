@@ -150,3 +150,17 @@ library.db
 *.m4a
 *.ogg
 *.opus
+
+# Editor swap/temp files
+*.kate-swp
+*.swp
+*.swo
+*~
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Sample/test audio files
+samples/
