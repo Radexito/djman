@@ -12,34 +12,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build dev image
+        uses: docker/build-push-action@v5
         with:
-          node-version: '22'
-          cache: 'npm'
+          context: .
+          load: true
+          tags: djman-dev:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Install root dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps
-
-      - name: Install renderer dependencies
-        run: cd renderer && npm ci --legacy-peer-deps
-
-      - name: Build native modules for Node (tests)
-        run: npm rebuild better-sqlite3
-
-      - name: Lint (main process)
-        run: npm run lint
-
-      - name: Lint (renderer)
-        run: cd renderer && npm run lint
-
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Test (main process)
-        run: npx vitest run --coverage
-        env:
-          DB_PATH: ':memory:'
-
-      - name: Test (renderer)
-        run: cd renderer && npm run test:coverage
+      - name: Lint and test
+        run: |
+          docker run --rm \
+            -v "$PWD:/app" -w /app \
+            -e DB_PATH=':memory:' \
+            djman-dev:latest sh -c "
+              npm ci --ignore-scripts --legacy-peer-deps &&
+              cd renderer && npm ci --legacy-peer-deps && cd .. &&
+              npm rebuild better-sqlite3 &&
+              npm run lint &&
+              cd renderer && npm run lint && cd .. &&
+              npm run format:check &&
+              npx vitest run --coverage &&
+              cd renderer && npm run test:coverage
+            "

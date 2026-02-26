@@ -38,26 +38,62 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── Linux: build inside the dev container ────────────────────────────
+      - uses: docker/setup-buildx-action@v3
+        if: matrix.platform == 'linux'
+
+      - name: Build dev image
+        if: matrix.platform == 'linux'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: djman-dev:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Electron app (Linux — inside container)
+        if: matrix.platform == 'linux'
+        run: |
+          docker run --rm \
+            -v "$PWD:/app" -w /app \
+            -e GH_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            djman-dev:latest sh -c "
+              npm ci --legacy-peer-deps &&
+              cd renderer && npm ci --legacy-peer-deps && cd .. &&
+              npm run build-renderer &&
+              node -e \"
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+                pkg.version = '0.0.${{ github.run_number }}';
+                fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+              \" &&
+              npx electron-builder --linux --publish never
+            "
+
+      # ── Windows / macOS: native runner ───────────────────────────────────
       - uses: actions/setup-node@v4
+        if: matrix.platform != 'linux'
         with:
           node-version: 22
           cache: npm
 
-      # ── Node deps + renderer build ────────────────────────────────────────
       - name: Install root dependencies
+        if: matrix.platform != 'linux'
         run: npm ci
 
       - name: Install renderer dependencies
+        if: matrix.platform != 'linux'
         run: cd renderer && npm ci
 
       - name: Build renderer
+        if: matrix.platform != 'linux'
         run: npm run build-renderer
 
-      # ── Stamp version from tag ────────────────────────────────────────────
       - name: Set version
+        if: matrix.platform != 'linux'
         shell: bash
         run: |
-          TAG="${{ needs.setup.outputs.tag }}"
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
@@ -65,13 +101,13 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
           "
 
-      # ── Build Electron app ────────────────────────────────────────────────
       - name: Build Electron app
+        if: matrix.platform != 'linux'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --${{ matrix.platform }} --publish never
 
-      # ── Upload artifacts for release job ─────────────────────────────────
+      # ── Upload artifacts ──────────────────────────────────────────────────
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.platform }}
