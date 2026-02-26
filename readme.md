@@ -83,3 +83,9 @@ Issues tracking upcoming work are on the [**Issues**](https://github.com/Radexit
 Audio is stored at `~/.config/djman/audio/<xx>/<hash>.<ext>` (configurable via Settings → Library). The two-character hash prefix keeps directory sizes manageable. Playlists reference tracks by ID — no duplicates, no copies.
 
 Logs are written daily to `~/.config/djman/logs/app-YYYY-MM-DD.log`.
+
+---
+
+## Contributing
+
+See [**CONTRIBUTING.md**](./CONTRIBUTING.md) for setup instructions, Docker dev container, project layout, and PR guidelines.

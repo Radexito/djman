@@ -1,0 +1,43 @@
+services:
+  # ── Full app (Electron GUI) ──────────────────────────────────────────────────
+  # Requires an X server on the host. On Linux: `xhost +local:docker` first.
+  # On macOS: install XQuartz and set DISPLAY=host.docker.internal:0
+  app:
+    build: .
+    volumes:
+      - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - node_modules:/workspace/node_modules
+      - renderer_node_modules:/workspace/renderer/node_modules
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - PULSE_SERVER=unix:${XDG_RUNTIME_DIR:-/run/user/1000}/pulse/native
+    devices:
+      - /dev/snd:/dev/snd
+    network_mode: host
+    command: npm run dev
+
+  # ── Tests only (no display needed) ──────────────────────────────────────────
+  test:
+    build: .
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - renderer_node_modules:/workspace/renderer/node_modules
+    command: >
+      sh -c "npm rebuild better-sqlite3 &&
+             npx vitest run &&
+             cd renderer && npm test"
+
+  # ── Lint only ────────────────────────────────────────────────────────────────
+  lint:
+    build: .
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - renderer_node_modules:/workspace/renderer/node_modules
+    command: npm run lint:all
+
+volumes:
+  node_modules:
+  renderer_node_modules:
