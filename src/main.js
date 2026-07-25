@@ -108,7 +108,7 @@ import {
   ensureTidalDlNg,
   updateAll,
 } from './deps.js';
-import { initLogger, getLogDir } from './logger.js';
+import { initLogger, getLogDir, initRendererLogger, logRendererMessage } from './logger.js';
 import { detectFilesystem, formatDrive, describeFilesystem } from './usb/usbUtils.js';
 import { writeAnlz, getAnlzFolder } from './audio/anlzWriter.js';
 import { writeSettingFiles } from './usb/settingWriter.js';
@@ -189,23 +189,33 @@ function createWindow() {
     if (menu.items.length > 0) menu.popup();
   });
 
+  // Always forward the renderer's DevTools console into its own log file so a
+  // bug reporter's console output (errors, our [diag]/[player] traces) can be
+  // captured even when nobody is watching the DevTools window live.
+  mainWindow.webContents.on('console-message', (_e, level, msg) => {
+    const levelName = ['verbose', 'info', 'warn', 'error'][level] ?? 'info';
+    logRendererMessage(levelName, msg);
+    if (!app.isPackaged) console.log(`[renderer:${levelName}]`, msg);
+  });
+
   if (process.env.E2E_TEST === '1') {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   } else if (!app.isPackaged) {
     mainWindow.loadURL(fs.readFileSync(path.join(__dirname, '../.dev-url'), 'utf8').trim());
     mainWindow.webContents.openDevTools();
-    // Forward renderer console to terminal so we can debug without DevTools window
-    mainWindow.webContents.on('console-message', (_e, level, msg) => {
-      const tag =
-        ['[renderer:verbose]', '[renderer:info]', '[renderer:warn]', '[renderer:error]'][level] ??
-        '[renderer]';
-      console.log(tag, msg);
-    });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
+    // DevTools is intentionally reachable in production too (Ctrl+Shift+I / F12 or
+    // Settings → Advanced → Open DevTools Console) so users can capture diagnostics
+    // for bug reports without a custom debug build.
     mainWindow.webContents.on('before-input-event', (event, input) => {
-      if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+      if (input.type !== 'keyDown') return;
+      if (
+        input.key === 'F12' ||
+        (input.control && input.shift && input.key.toUpperCase() === 'I')
+      ) {
         event.preventDefault();
+        mainWindow.webContents.toggleDevTools();
       }
     });
   }
@@ -307,6 +317,7 @@ function sendDepsProgress(data) {
 
 async function initApp() {
   initLogger();
+  initRendererLogger();
   if (process.platform === 'win32') logDiagnostics();
   console.log('Initializing database...');
   initDB();
@@ -844,6 +855,7 @@ ipcMain.on('renderer-log', (_, { level, msg }) => {
 
 ipcMain.handle('get-log-dir', () => getLogDir());
 ipcMain.handle('open-log-dir', () => shell.openPath(getLogDir()));
+ipcMain.handle('open-devtools', () => mainWindow?.webContents.openDevTools());
 ipcMain.handle('get-dep-versions', () => getInstalledVersions());
 ipcMain.handle('check-dep-updates', () => checkForUpdates());
 ipcMain.handle('update-analyzer', async (_event) => {

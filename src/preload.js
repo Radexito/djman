@@ -247,6 +247,7 @@ contextBridge.exposeInMainWorld('api', {
   clearUserData: () => ipcRenderer.invoke('clear-user-data'),
   getLogDir: () => ipcRenderer.invoke('get-log-dir'),
   openLogDir: () => ipcRenderer.invoke('open-log-dir'),
+  openDevTools: () => ipcRenderer.invoke('open-devtools'),
   log: (level, ...args) => ipcRenderer.send('renderer-log', { level, msg: args.join(' ') }),
   getDepVersions: () => ipcRenderer.invoke('get-dep-versions'),
   checkDepUpdates: () => ipcRenderer.invoke('check-dep-updates'),
