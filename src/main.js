@@ -192,10 +192,27 @@ function createWindow() {
   // Always forward the renderer's DevTools console into its own log file so a
   // bug reporter's console output (errors, our [diag]/[player] traces) can be
   // captured even when nobody is watching the DevTools window live.
-  mainWindow.webContents.on('console-message', (_e, level, msg) => {
-    const levelName = ['verbose', 'info', 'warn', 'error'][level] ?? 'info';
-    logRendererMessage(levelName, msg);
-    if (!app.isPackaged) console.log(`[renderer:${levelName}]`, msg);
+  mainWindow.webContents.on('console-message', ({ level, message }) => {
+    logRendererMessage(level, message);
+    if (!app.isPackaged) console.log(`[renderer:${level}]`, message);
+  });
+
+  // "Failed to load resource" lines (network-level errors, and HTTP error
+  // statuses like the media server's 403) show up in the DevTools console but
+  // are NOT delivered via 'console-message' — Chromium reports them through
+  // webRequest instead. Capture both so a 404/403 on an audio file (the likely
+  // shape of #361) actually lands in the log.
+  const requestLogSession = mainWindow.webContents.session;
+  requestLogSession.webRequest.onErrorOccurred((details) => {
+    if (details.error.includes('ERR_ABORTED')) return; // benign: cancelled in-flight requests (e.g. track skip)
+    logRendererMessage('error', `Failed to load resource: ${details.error} ${details.url}`);
+  });
+  requestLogSession.webRequest.onCompleted((details) => {
+    if (details.statusCode < 400) return;
+    logRendererMessage(
+      'error',
+      `Failed to load resource: the server responded with a status of ${details.statusCode} ${details.url}`
+    );
   });
 
   if (process.env.E2E_TEST === '1') {
