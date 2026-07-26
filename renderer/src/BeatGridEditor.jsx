@@ -158,7 +158,7 @@ function drawDetail(canvas, detail, viewCenter, beats, cuePoints, viewMs) {
       ctx.lineTo(x, H);
       ctx.stroke();
 
-      const label = cue.hot_cue_index >= 0 ? 'ABCDEFGH'[cue.hot_cue_index] : '●';
+      const label = cue.hot_cue_index >= 0 ? 'ABCDEFGHIJKLMNOP'[cue.hot_cue_index] : '●';
       ctx.fillStyle = color;
       ctx.fillRect(x, H - 18, cue.hot_cue_index >= 0 ? 12 : 10, 14);
       ctx.fillStyle = '#000';
