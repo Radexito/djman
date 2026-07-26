@@ -113,6 +113,7 @@ import { detectFilesystem, formatDrive, describeFilesystem } from './usb/usbUtil
 import { writeAnlz, getAnlzFolder } from './audio/anlzWriter.js';
 import { writeSettingFiles } from './usb/settingWriter.js';
 import { writePdb } from './usb/pdbWriter.js';
+import { resolveExportFormat } from './usb/deviceFormats.js';
 import { getResetCleanupTargets, startResetCleanup } from './resetCleanup.js';
 import {
   getCuePoints,
@@ -1790,21 +1791,28 @@ ipcMain.handle('format-usb', async (_, { device, mountPoint }) => {
   }
 });
 
-/** Copies a track's audio file to {usbRoot}/music/, returns the USB path or null on error. */
+/**
+ * Copies a track's audio file to {usbRoot}/music/, returns { path, meta }.
+ * `meta` is non-null only when the file was re-encoded to a different format,
+ * in which case it carries the real output fileSize/bitrate for the PDB row
+ * (the source DB values no longer apply once the container/codec changes).
+ */
 async function copyTrackToUsb(
   track,
   usbRoot,
   usedNames,
-  { useNormalized = false, targetLufs = null } = {}
+  { useNormalized = false, targetLufs = null, targetDevice = null, forceMp3 = false } = {}
 ) {
   const srcPath = track.file_path;
-  const ext = path.extname(srcPath || '');
-  const filename = trackToFilename(track, ext);
+  const srcExt = path.extname(srcPath || '');
+  const targetFormat = resolveExportFormat({ srcExt, deviceKey: targetDevice, forceMp3 });
+  const outExt = targetFormat ? `.${targetFormat}` : srcExt;
+  const filename = trackToFilename(track, outExt);
   // Deduplicate filename
   let finalName = filename;
   let n = 1;
   while (usedNames.has(finalName.toLowerCase())) {
-    finalName = filename.replace(ext, ` (${n++})${ext}`);
+    finalName = filename.replace(outExt, ` (${n++})${outExt}`);
   }
   usedNames.set(finalName.toLowerCase(), true);
 
@@ -1812,18 +1820,31 @@ async function copyTrackToUsb(
   fs.mkdirSync(destDir, { recursive: true });
   const destPath = path.join(destDir, finalName);
 
+  let meta = null;
   if (!fs.existsSync(destPath) && fs.existsSync(srcPath)) {
     const sourceLoudness = track.loudness;
-    if (useNormalized && targetLufs != null && sourceLoudness != null) {
-      const gainDb = targetLufs - sourceLoudness;
-      const sourceBitrateKbps = track.bitrate ? track.bitrate / 1000 : null;
-      await convertAudio(srcPath, destPath, { gainDb, sourceBitrateKbps });
+    const gainDb =
+      useNormalized && targetLufs != null && sourceLoudness != null
+        ? targetLufs - sourceLoudness
+        : 0;
+    const sourceBitrateKbps = track.bitrate ? track.bitrate / 1000 : null;
+
+    if (targetFormat || gainDb !== 0) {
+      await convertAudio(srcPath, destPath, { gainDb, sourceBitrateKbps, format: targetFormat });
+      if (targetFormat) {
+        const fileSize = fs.statSync(destPath).size;
+        const durationSec = track.duration || null;
+        meta = {
+          fileSize,
+          bitrate: durationSec ? Math.round((fileSize * 8) / durationSec) : track.bitrate || 0,
+        };
+      }
     } else {
       fs.copyFileSync(srcPath, destPath);
     }
   }
 
-  return `/music/${finalName}`;
+  return { path: `/music/${finalName}`, meta };
 }
 
 /** Writes the Rekordbox PDB database file using the pure-JS writer. */
@@ -1872,7 +1893,17 @@ function saveManifest(usbRoot, tracksMap, playlistsMap) {
 
 ipcMain.handle(
   'export-rekordbox',
-  async (_, { usbRoot, playlistIds, playlistId, useNormalized = false }) => {
+  async (
+    _,
+    {
+      usbRoot,
+      playlistIds,
+      playlistId,
+      useNormalized = false,
+      targetDevice = null,
+      forceMp3 = false,
+    }
+  ) => {
     try {
       const targetLufs = useNormalized ? Number(getSetting('normalize_target_lufs', '-9')) : null;
       const ids = playlistIds?.length ? playlistIds : playlistId ? [playlistId] : null;
@@ -1909,10 +1940,17 @@ ipcMain.handle(
 
       // 2. Copy files to USB, build USB path map
       const usbPaths = new Map(); // trackId → USB path
+      const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
       for (let i = 0; i < tracks.length; i++) {
         const t = tracks[i];
-        const usbPath = await copyTrackToUsb(t, usbRoot, usedNames, { useNormalized, targetLufs });
+        const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
+          useNormalized,
+          targetLufs,
+          targetDevice,
+          forceMp3,
+        });
         usbPaths.set(t.id, usbPath);
+        if (meta) usbMeta.set(t.id, meta);
         send('export-rekordbox-progress', {
           msg: `Copying files… ${i + 1}/${total}`,
           pct: Math.round(((i + 1) / total) * 40),
@@ -1964,8 +2002,8 @@ ipcMain.handle(
         year: t.year || '',
         label: t.label || '',
         genres: t.genres ? JSON.parse(t.genres) : [],
-        file_size: t.file_size || 0,
-        bitrate: t.bitrate || 0,
+        file_size: usbMeta.get(t.id)?.fileSize ?? t.file_size ?? 0,
+        bitrate: usbMeta.get(t.id)?.bitrate ?? t.bitrate ?? 0,
         comments: t.comments || '',
         rating: t.rating || 0,
         replay_gain: t.replay_gain ?? null,
@@ -2006,7 +2044,17 @@ ipcMain.handle(
 
 ipcMain.handle(
   'export-all',
-  async (_, { usbRoot, playlistIds, playlistId, useNormalized = false }) => {
+  async (
+    _,
+    {
+      usbRoot,
+      playlistIds,
+      playlistId,
+      useNormalized = false,
+      targetDevice = null,
+      forceMp3 = false,
+    }
+  ) => {
     try {
       const targetLufs = useNormalized ? Number(getSetting('normalize_target_lufs', '-9')) : null;
       const ids = playlistIds?.length ? playlistIds : playlistId ? [playlistId] : null;
@@ -2044,12 +2092,17 @@ ipcMain.handle(
 
       // Copy files once
       const usbPaths = new Map();
+      const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
       for (let i = 0; i < allTracks.length; i++) {
         const t = allTracks[i];
-        usbPaths.set(
-          t.id,
-          await copyTrackToUsb(t, usbRoot, usedNames, { useNormalized, targetLufs })
-        );
+        const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
+          useNormalized,
+          targetLufs,
+          targetDevice,
+          forceMp3,
+        });
+        usbPaths.set(t.id, usbPath);
+        if (meta) usbMeta.set(t.id, meta);
         send('export-all-progress', {
           msg: `Copying files… ${i + 1}/${total}`,
           pct: Math.round(((i + 1) / total) * 35),
@@ -2120,8 +2173,8 @@ ipcMain.handle(
         year: t.year || '',
         label: t.label || '',
         genres: t.genres ? JSON.parse(t.genres) : [],
-        file_size: t.file_size || 0,
-        bitrate: t.bitrate || 0,
+        file_size: usbMeta.get(t.id)?.fileSize ?? t.file_size ?? 0,
+        bitrate: usbMeta.get(t.id)?.bitrate ?? t.bitrate ?? 0,
         comments: t.comments || '',
         rating: t.rating || 0,
         replay_gain: t.replay_gain ?? null,
