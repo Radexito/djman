@@ -486,9 +486,7 @@ export default function CuePointsEditor({
                         <button
                           className={`cpe__type-opt${cue.hot_cue_index === i ? ' cpe__type-opt--active' : ''}`}
                           style={
-                            cue.hot_cue_index === i
-                              ? { background: cue.color, color: '#000' }
-                              : {}
+                            cue.hot_cue_index === i ? { background: cue.color, color: '#000' } : {}
                           }
                           onClick={() => handleTypeChange(cue.id, i)}
                           title={`Hot cue ${label}${i >= HOT_CUE_PAGE_SIZE ? ' (page 2)' : ''}`}
