@@ -1,11 +1,12 @@
 import SearchBar from './SearchBar.jsx';
+import logo from './assets/logo.png';
 import './TopBar.css';
 
 export default function TopBar({ search, onSearchChange, onOpenSettings }) {
   return (
     <div className="top-bar">
       <div className="top-bar__logo">
-        <img className="top-bar__logo-img" src="/logo.png" alt="DJ Manager" draggable={false} />
+        <img className="top-bar__logo-img" src={logo} alt="DJ Manager" draggable={false} />
       </div>
 
       <div className="top-bar__search">

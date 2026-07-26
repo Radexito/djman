@@ -219,6 +219,10 @@ function SettingsModal({ onClose }) {
     await window.api.openLogDir();
   };
 
+  const handleOpenDevTools = async () => {
+    await window.api.openDevTools();
+  };
+
   const handleBrowseLibrary = async () => {
     const dir = await window.api.openDirDialog();
     if (dir) setConfirmMove(dir);
@@ -834,11 +838,24 @@ function SettingsModal({ onClose }) {
                   <div>
                     <div className="settings-action-label">Log Files</div>
                     <div className="settings-action-desc">
-                      Opens the folder containing runtime log files.
+                      Opens the folder containing runtime log files, including the renderer console
+                      log (renderer-console-*.log).
                     </div>
                   </div>
                   <button className="btn-secondary" onClick={handleOpenLogs}>
                     Open Log Folder
+                  </button>
+                </div>
+                <div className="settings-row settings-row-action" style={{ marginTop: '0.75rem' }}>
+                  <div>
+                    <div className="settings-action-label">DevTools Console</div>
+                    <div className="settings-action-desc">
+                      Opens the developer console (also reachable with Ctrl+Shift+I or F12) for live
+                      debugging while reporting a bug.
+                    </div>
+                  </div>
+                  <button className="btn-secondary" onClick={handleOpenDevTools}>
+                    Open DevTools Console
                   </button>
                 </div>
               </div>
