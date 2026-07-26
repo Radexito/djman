@@ -108,11 +108,12 @@ import {
   ensureTidalDlNg,
   updateAll,
 } from './deps.js';
-import { initLogger, getLogDir } from './logger.js';
+import { initLogger, getLogDir, initRendererLogger, logRendererMessage } from './logger.js';
 import { detectFilesystem, formatDrive, describeFilesystem } from './usb/usbUtils.js';
 import { writeAnlz, getAnlzFolder } from './audio/anlzWriter.js';
 import { writeSettingFiles } from './usb/settingWriter.js';
 import { writePdb } from './usb/pdbWriter.js';
+import { resolveExportFormat } from './usb/deviceFormats.js';
 import { getResetCleanupTargets, startResetCleanup } from './resetCleanup.js';
 import {
   getCuePoints,
@@ -189,23 +190,50 @@ function createWindow() {
     if (menu.items.length > 0) menu.popup();
   });
 
+  // Always forward the renderer's DevTools console into its own log file so a
+  // bug reporter's console output (errors, our [diag]/[player] traces) can be
+  // captured even when nobody is watching the DevTools window live.
+  mainWindow.webContents.on('console-message', ({ level, message }) => {
+    logRendererMessage(level, message);
+    if (!app.isPackaged) console.log(`[renderer:${level}]`, message);
+  });
+
+  // "Failed to load resource" lines (network-level errors, and HTTP error
+  // statuses like the media server's 403) show up in the DevTools console but
+  // are NOT delivered via 'console-message' — Chromium reports them through
+  // webRequest instead. Capture both so a 404/403 on an audio file (the likely
+  // shape of #361) actually lands in the log.
+  const requestLogSession = mainWindow.webContents.session;
+  requestLogSession.webRequest.onErrorOccurred((details) => {
+    if (details.error.includes('ERR_ABORTED')) return; // benign: cancelled in-flight requests (e.g. track skip)
+    logRendererMessage('error', `Failed to load resource: ${details.error} ${details.url}`);
+  });
+  requestLogSession.webRequest.onCompleted((details) => {
+    if (details.statusCode < 400) return;
+    logRendererMessage(
+      'error',
+      `Failed to load resource: the server responded with a status of ${details.statusCode} ${details.url}`
+    );
+  });
+
   if (process.env.E2E_TEST === '1') {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
   } else if (!app.isPackaged) {
     mainWindow.loadURL(fs.readFileSync(path.join(__dirname, '../.dev-url'), 'utf8').trim());
     mainWindow.webContents.openDevTools();
-    // Forward renderer console to terminal so we can debug without DevTools window
-    mainWindow.webContents.on('console-message', (_e, level, msg) => {
-      const tag =
-        ['[renderer:verbose]', '[renderer:info]', '[renderer:warn]', '[renderer:error]'][level] ??
-        '[renderer]';
-      console.log(tag, msg);
-    });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/dist/index.html'));
+    // DevTools is intentionally reachable in production too (Ctrl+Shift+I / F12 or
+    // Settings → Advanced → Open DevTools Console) so users can capture diagnostics
+    // for bug reports without a custom debug build.
     mainWindow.webContents.on('before-input-event', (event, input) => {
-      if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+      if (input.type !== 'keyDown') return;
+      if (
+        input.key === 'F12' ||
+        (input.control && input.shift && input.key.toUpperCase() === 'I')
+      ) {
         event.preventDefault();
+        mainWindow.webContents.toggleDevTools();
       }
     });
   }
@@ -307,6 +335,7 @@ function sendDepsProgress(data) {
 
 async function initApp() {
   initLogger();
+  initRendererLogger();
   if (process.platform === 'win32') logDiagnostics();
   console.log('Initializing database...');
   initDB();
@@ -844,6 +873,7 @@ ipcMain.on('renderer-log', (_, { level, msg }) => {
 
 ipcMain.handle('get-log-dir', () => getLogDir());
 ipcMain.handle('open-log-dir', () => shell.openPath(getLogDir()));
+ipcMain.handle('open-devtools', () => mainWindow?.webContents.openDevTools());
 ipcMain.handle('get-dep-versions', () => getInstalledVersions());
 ipcMain.handle('check-dep-updates', () => checkForUpdates());
 ipcMain.handle('update-analyzer', async (_event) => {
@@ -1761,21 +1791,28 @@ ipcMain.handle('format-usb', async (_, { device, mountPoint }) => {
   }
 });
 
-/** Copies a track's audio file to {usbRoot}/music/, returns the USB path or null on error. */
+/**
+ * Copies a track's audio file to {usbRoot}/music/, returns { path, meta }.
+ * `meta` is non-null only when the file was re-encoded to a different format,
+ * in which case it carries the real output fileSize/bitrate for the PDB row
+ * (the source DB values no longer apply once the container/codec changes).
+ */
 async function copyTrackToUsb(
   track,
   usbRoot,
   usedNames,
-  { useNormalized = false, targetLufs = null } = {}
+  { useNormalized = false, targetLufs = null, targetDevice = null, forceMp3 = false } = {}
 ) {
   const srcPath = track.file_path;
-  const ext = path.extname(srcPath || '');
-  const filename = trackToFilename(track, ext);
+  const srcExt = path.extname(srcPath || '');
+  const targetFormat = resolveExportFormat({ srcExt, deviceKey: targetDevice, forceMp3 });
+  const outExt = targetFormat ? `.${targetFormat}` : srcExt;
+  const filename = trackToFilename(track, outExt);
   // Deduplicate filename
   let finalName = filename;
   let n = 1;
   while (usedNames.has(finalName.toLowerCase())) {
-    finalName = filename.replace(ext, ` (${n++})${ext}`);
+    finalName = filename.replace(outExt, ` (${n++})${outExt}`);
   }
   usedNames.set(finalName.toLowerCase(), true);
 
@@ -1783,18 +1820,31 @@ async function copyTrackToUsb(
   fs.mkdirSync(destDir, { recursive: true });
   const destPath = path.join(destDir, finalName);
 
+  let meta = null;
   if (!fs.existsSync(destPath) && fs.existsSync(srcPath)) {
     const sourceLoudness = track.loudness;
-    if (useNormalized && targetLufs != null && sourceLoudness != null) {
-      const gainDb = targetLufs - sourceLoudness;
-      const sourceBitrateKbps = track.bitrate ? track.bitrate / 1000 : null;
-      await convertAudio(srcPath, destPath, { gainDb, sourceBitrateKbps });
+    const gainDb =
+      useNormalized && targetLufs != null && sourceLoudness != null
+        ? targetLufs - sourceLoudness
+        : 0;
+    const sourceBitrateKbps = track.bitrate ? track.bitrate / 1000 : null;
+
+    if (targetFormat || gainDb !== 0) {
+      await convertAudio(srcPath, destPath, { gainDb, sourceBitrateKbps, format: targetFormat });
+      if (targetFormat) {
+        const fileSize = fs.statSync(destPath).size;
+        const durationSec = track.duration || null;
+        meta = {
+          fileSize,
+          bitrate: durationSec ? Math.round((fileSize * 8) / durationSec) : track.bitrate || 0,
+        };
+      }
     } else {
       fs.copyFileSync(srcPath, destPath);
     }
   }
 
-  return `/music/${finalName}`;
+  return { path: `/music/${finalName}`, meta };
 }
 
 /** Writes the Rekordbox PDB database file using the pure-JS writer. */
@@ -1843,7 +1893,17 @@ function saveManifest(usbRoot, tracksMap, playlistsMap) {
 
 ipcMain.handle(
   'export-rekordbox',
-  async (_, { usbRoot, playlistIds, playlistId, useNormalized = false }) => {
+  async (
+    _,
+    {
+      usbRoot,
+      playlistIds,
+      playlistId,
+      useNormalized = false,
+      targetDevice = null,
+      forceMp3 = false,
+    }
+  ) => {
     try {
       const targetLufs = useNormalized ? Number(getSetting('normalize_target_lufs', '-9')) : null;
       const ids = playlistIds?.length ? playlistIds : playlistId ? [playlistId] : null;
@@ -1880,10 +1940,17 @@ ipcMain.handle(
 
       // 2. Copy files to USB, build USB path map
       const usbPaths = new Map(); // trackId → USB path
+      const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
       for (let i = 0; i < tracks.length; i++) {
         const t = tracks[i];
-        const usbPath = await copyTrackToUsb(t, usbRoot, usedNames, { useNormalized, targetLufs });
+        const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
+          useNormalized,
+          targetLufs,
+          targetDevice,
+          forceMp3,
+        });
         usbPaths.set(t.id, usbPath);
+        if (meta) usbMeta.set(t.id, meta);
         send('export-rekordbox-progress', {
           msg: `Copying files… ${i + 1}/${total}`,
           pct: Math.round(((i + 1) / total) * 40),
@@ -1935,8 +2002,8 @@ ipcMain.handle(
         year: t.year || '',
         label: t.label || '',
         genres: t.genres ? JSON.parse(t.genres) : [],
-        file_size: t.file_size || 0,
-        bitrate: t.bitrate || 0,
+        file_size: usbMeta.get(t.id)?.fileSize ?? t.file_size ?? 0,
+        bitrate: usbMeta.get(t.id)?.bitrate ?? t.bitrate ?? 0,
         comments: t.comments || '',
         rating: t.rating || 0,
         replay_gain: t.replay_gain ?? null,
@@ -1977,7 +2044,17 @@ ipcMain.handle(
 
 ipcMain.handle(
   'export-all',
-  async (_, { usbRoot, playlistIds, playlistId, useNormalized = false }) => {
+  async (
+    _,
+    {
+      usbRoot,
+      playlistIds,
+      playlistId,
+      useNormalized = false,
+      targetDevice = null,
+      forceMp3 = false,
+    }
+  ) => {
     try {
       const targetLufs = useNormalized ? Number(getSetting('normalize_target_lufs', '-9')) : null;
       const ids = playlistIds?.length ? playlistIds : playlistId ? [playlistId] : null;
@@ -2015,12 +2092,17 @@ ipcMain.handle(
 
       // Copy files once
       const usbPaths = new Map();
+      const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
       for (let i = 0; i < allTracks.length; i++) {
         const t = allTracks[i];
-        usbPaths.set(
-          t.id,
-          await copyTrackToUsb(t, usbRoot, usedNames, { useNormalized, targetLufs })
-        );
+        const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
+          useNormalized,
+          targetLufs,
+          targetDevice,
+          forceMp3,
+        });
+        usbPaths.set(t.id, usbPath);
+        if (meta) usbMeta.set(t.id, meta);
         send('export-all-progress', {
           msg: `Copying files… ${i + 1}/${total}`,
           pct: Math.round(((i + 1) / total) * 35),
@@ -2091,8 +2173,8 @@ ipcMain.handle(
         year: t.year || '',
         label: t.label || '',
         genres: t.genres ? JSON.parse(t.genres) : [],
-        file_size: t.file_size || 0,
-        bitrate: t.bitrate || 0,
+        file_size: usbMeta.get(t.id)?.fileSize ?? t.file_size ?? 0,
+        bitrate: usbMeta.get(t.id)?.bitrate ?? t.bitrate ?? 0,
         comments: t.comments || '',
         rating: t.rating || 0,
         replay_gain: t.replay_gain ?? null,

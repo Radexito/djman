@@ -22,6 +22,38 @@ function ProgressBar({ pct }) {
   );
 }
 
+// Keep in sync with DEVICE_PROFILES keys/labels in src/usb/deviceFormats.js
+const DEVICE_OPTIONS = [
+  { key: 'cdj-3000', label: 'CDJ-3000' },
+  { key: 'cdj-2000nxs2', label: 'CDJ-2000NXS2' },
+  { key: 'xdj-rx3', label: 'XDJ-RX3' },
+  { key: 'xdj-rx2', label: 'XDJ-RX2' },
+  { key: 'xdj-1000mk2', label: 'XDJ-1000MK2' },
+  { key: 'xdj-700', label: 'XDJ-700' },
+];
+
+function ExportFormatOptions({ targetDevice, setTargetDevice, forceMp3, setForceMp3 }) {
+  return (
+    <div className="export-format-options">
+      <label className="export-device-option">
+        <span>Target device</span>
+        <select value={targetDevice} onChange={(e) => setTargetDevice(e.target.value)}>
+          <option value="">None — keep source formats</option>
+          {DEVICE_OPTIONS.map((d) => (
+            <option key={d.key} value={d.key}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="export-normalized-option">
+        <input type="checkbox" checked={forceMp3} onChange={(e) => setForceMp3(e.target.checked)} />
+        <span>Re-encode all tracks to MP3</span>
+      </label>
+    </div>
+  );
+}
+
 function ExportModal({ onClose, playlistId, initialMode }) {
   const [step, setStep] = useState(initialMode ? STEPS.confirm : STEPS.idle);
   const [mode, setMode] = useState(initialMode ?? null);
@@ -32,6 +64,8 @@ function ExportModal({ onClose, playlistId, initialMode }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [useNormalized, setUseNormalized] = useState(true);
+  const [targetDevice, setTargetDevice] = useState('');
+  const [forceMp3, setForceMp3] = useState(false);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -91,12 +125,16 @@ function ExportModal({ onClose, playlistId, initialMode }) {
         usbRoot: dir,
         playlistId: playlistId ?? null,
         useNormalized,
+        targetDevice: targetDevice || null,
+        forceMp3,
       });
     } else {
       res = await window.api.exportAll({
         usbRoot: dir,
         playlistId: playlistId ?? null,
         useNormalized,
+        targetDevice: targetDevice || null,
+        forceMp3,
       });
     }
     if (res.ok) {
@@ -143,6 +181,12 @@ function ExportModal({ onClose, playlistId, initialMode }) {
               />
               <span>Apply loudness normalization to exported files</span>
             </label>
+            <ExportFormatOptions
+              targetDevice={targetDevice}
+              setTargetDevice={setTargetDevice}
+              forceMp3={forceMp3}
+              setForceMp3={setForceMp3}
+            />
             <div className="export-options">
               <button className="export-option-btn" onClick={() => pickFolder('rekordbox')}>
                 <span className="export-option-icon">💾</span>
@@ -181,6 +225,12 @@ function ExportModal({ onClose, playlistId, initialMode }) {
               />
               <span>Apply loudness normalization to exported files</span>
             </label>
+            <ExportFormatOptions
+              targetDevice={targetDevice}
+              setTargetDevice={setTargetDevice}
+              forceMp3={forceMp3}
+              setForceMp3={setForceMp3}
+            />
             <div className="export-confirm-actions">
               <button className="export-option-btn" onClick={() => pickFolder(mode)}>
                 <span className="export-option-icon">{mode === 'rekordbox' ? '💾' : '📦'}</span>

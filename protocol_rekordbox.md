@@ -134,11 +134,11 @@ Followed by `beat_count × 8` bytes, one entry per beat:
 
 `len_header = 20`
 
-| Offset | Size | Description                       |
+| Offset | Size | Description |
 | ------ | ---- | --------------------------------- | ------------- |
-| 12     | 4    | `len_data` (always 400)           |
-| 16     | 4    | `0x00010000` (constant)           |
-| 20     | 400  | 400 bytes: `(whiteness[0–7] << 5) | height[0–31]` |
+| 12 | 4 | `len_data` (always 400) |
+| 16 | 4 | `0x00010000` (constant) |
+| 20 | 400 | 400 bytes: `(whiteness[0–7] << 5) | height[0–31]` |
 
 ### PWV2 — Tiny Monochrome Preview (CDJ-900)
 

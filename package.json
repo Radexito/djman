@@ -1,6 +1,6 @@
 {
   "name": "dj_manager",
-  "version": "1.0.18",
+  "version": "1.0.21",
   "description": "DJ-focused music library manager",
   "main": "src/main.js",
   "scripts": {
@@ -124,14 +124,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.61.1",
     "@vitest/coverage-v8": "^4.1.6",
     "concurrently": "^10.0.3",
     "electron": "^41.5.0",
     "electron-builder": "^26.8.1",
     "electron-rebuild": "^3.2.9",
     "eslint": "^10.6.0",
-    "globals": "^17.6.0",
+    "globals": "^17.7.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
     "prettier": "^3.9.4",
@@ -142,7 +142,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "react-virtualized": "^9.22.6",
     "react-window": "^2.2.7"
   }
