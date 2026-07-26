@@ -434,7 +434,7 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
                       title={
                         cue.label ||
                         (cue.hot_cue_index >= 0
-                          ? `Hot cue ${'ABCDEFGH'[cue.hot_cue_index]}`
+                          ? `Hot cue ${'ABCDEFGHIJKLMNOP'[cue.hot_cue_index]}`
                           : 'Memory cue')
                       }
                       onClick={() => seek(cue.position_ms / 1000)}
