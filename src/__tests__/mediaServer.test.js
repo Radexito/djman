@@ -3,7 +3,8 @@ import fs from 'fs';
 import http from 'http';
 import os from 'os';
 import path from 'path';
-import { startMediaServer, AUDIO_MIME } from '../audio/mediaServer.js';
+import { EventEmitter } from 'events';
+import { startMediaServer, streamFile, AUDIO_MIME } from '../audio/mediaServer.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,5 +166,26 @@ describe('GET — missing file', () => {
     const missing = path.join(audioBase, 'nope.mp3');
     const res = await httpGet(`http://127.0.0.1:${port}${toUrlPath(missing)}`);
     expect(res.status).toBe(404);
+  });
+});
+
+// ── File disappears mid-stream (e.g. USB unplugged while playing) ──────────────
+// A real fs race (delete-during-read) is too timing-sensitive to reproduce
+// reliably in CI, so this exercises streamFile() directly with a fake stream
+// that errors after piping has started — the exact shape of the real failure.
+
+describe('streamFile — read stream errors mid-transfer', () => {
+  it('destroys the response instead of throwing an uncaught error', () => {
+    const fakeStream = new EventEmitter();
+    fakeStream.pipe = () => {}; // stub — we only care about error handling here
+    let destroyed = false;
+    const fakeRes = { destroy: () => (destroyed = true) };
+
+    expect(() => {
+      streamFile(fakeStream, fakeRes);
+      fakeStream.emit('error', Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    }).not.toThrow();
+
+    expect(destroyed).toBe(true);
   });
 });
