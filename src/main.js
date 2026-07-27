@@ -44,7 +44,6 @@ import {
   reorderPlaylistTracks,
   getPlaylistsForTrack,
   getPlaylistTracks,
-  clearPlaylists,
 } from './db/playlistRepository.js';
 import {
   addTrack,
@@ -58,7 +57,7 @@ import {
   removeTrack,
   updateTrack,
   resetNormalization,
-  clearTracks,
+  clearTracksForLibrary,
   getTrackIdsNeedingNormalization,
   getNormalizedTrackCount,
   getLegacyNormalizedTracks,
@@ -77,7 +76,19 @@ import {
   spawnAnalysis,
   cancelAnalysis,
   getLibraryBase,
+  getStorageFormat,
+  convertStorageFormat,
 } from './audio/importManager.js';
+import {
+  listLibraries,
+  createLibrary,
+  renameLibrary,
+  getCurrentLibraryId,
+  setCurrentLibraryId,
+  getDefaultLibraryId,
+  setLibraryRootPath,
+} from './db/libraryRepository.js';
+import { getDbPath, setDbPath } from './db/dbLocation.js';
 import { convertAudio } from './audio/ffmpeg.js';
 
 import {
@@ -131,6 +142,7 @@ const __dirname = path.dirname(__filename);
 let mainWindow;
 
 import { startMediaServer as _startMediaServer } from './audio/mediaServer.js';
+import { moveFileSafe } from './utils/fsMove.js';
 import { getArtworkBase } from './audio/importManager.js';
 import { writeId3Tags } from './audio/id3Writer.js';
 
@@ -145,11 +157,20 @@ let mediaServerPort = null;
 const explorerAllowedBases = [];
 
 function startMediaServer() {
-  // Respect a relocated library (Settings → move library / external drive):
-  // getLibraryBase() falls back to userData/audio only when no custom
-  // library_path setting is stored.
-  const audioBase = getLibraryBase();
-  const artworkBase = getArtworkBase();
+  // With multiple libraries live at once (#390), there's no single implicit
+  // "the" library any more — the oldest one keeps the primary audioBase slot
+  // (matches pre-#390 behavior for upgrading installs) and every other
+  // library's folder is added to the allow-list so playback works for all of
+  // them without needing per-library server instances.
+  const defaultId = getDefaultLibraryId();
+  const audioBase = getLibraryBase(defaultId);
+  const artworkBase = getArtworkBase(defaultId);
+  for (const lib of listLibraries()) {
+    if (lib.id === defaultId) continue;
+    for (const base of [getLibraryBase(lib.id), getArtworkBase(lib.id)]) {
+      if (!explorerAllowedBases.includes(base)) explorerAllowedBases.push(base);
+    }
+  }
   return _startMediaServer(audioBase, artworkBase, explorerAllowedBases).then(({ port }) => {
     mediaServerPort = port;
   });
@@ -396,9 +417,14 @@ ipcMain.handle('get-track-waveform', (_, trackId) => {
 });
 ipcMain.handle('get-setting', (_, key, def) => getSetting(key, def));
 ipcMain.handle('set-setting', (_, key, value) => setSetting(key, value));
-ipcMain.handle('get-library-path', () => getLibraryBase());
-ipcMain.handle('move-library', async (event, newDir) => {
-  const oldBase = getLibraryBase();
+// `libraryId` defaults to the current "import target" library when omitted —
+// most existing call sites predate multi-library support and don't pass one.
+ipcMain.handle('get-library-path', (_, libraryId) =>
+  getLibraryBase(libraryId ?? getCurrentLibraryId())
+);
+ipcMain.handle('move-library', async (event, newDir, libraryId) => {
+  const id = libraryId ?? getCurrentLibraryId();
+  const oldBase = getLibraryBase(id);
 
   if (!newDir || newDir === oldBase) throw new Error('Same directory selected.');
 
@@ -408,8 +434,8 @@ ipcMain.handle('move-library', async (event, newDir) => {
   // doesn't help when the user picks a drive root as the new library folder.
   if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
 
-  // Gather all tracks
-  const tracks = getTracks({ limit: 999999 });
+  // Gather this library's tracks only — other libraries' files are untouched.
+  const tracks = getTracks({ limit: 999999, libraryIds: [id] });
   const total = tracks.length;
   let moved = 0;
 
@@ -424,16 +450,7 @@ ipcMain.handle('move-library', async (event, newDir) => {
     const rel = path.relative(oldBase, oldPath);
     const newPath = path.join(newDir, rel);
     fs.mkdirSync(path.dirname(newPath), { recursive: true });
-    try {
-      fs.renameSync(oldPath, newPath);
-    } catch (err) {
-      // rename() is a same-filesystem metadata op — it can't cross drive
-      // letters (e.g. moving the library to an external drive), so fall
-      // back to copy + delete whenever the destination is a different volume.
-      if (err.code !== 'EXDEV') throw err;
-      fs.copyFileSync(oldPath, newPath);
-      fs.unlinkSync(oldPath);
-    }
+    moveFileSafe(oldPath, newPath);
     updateTrack(track.id, { file_path: newPath });
     moved++;
 
@@ -453,11 +470,59 @@ ipcMain.handle('move-library', async (event, newDir) => {
     /* ignore */
   }
 
-  setSetting('library_path', newDir);
+  setLibraryRootPath(id, newDir);
   // The running media server's audioBase was fixed at startup — allow the new
   // location immediately so playback doesn't require an app restart.
   if (!explorerAllowedBases.includes(newDir)) explorerAllowedBases.push(newDir);
   return { moved, total };
+});
+
+// ── Multiple libraries ───────────────────────────────────────────────────────
+// All libraries live in one database (see libraryRepository.js) and are
+// active/visible at the same time — no restart to "switch" between them.
+// "Current library" only affects where new imports land.
+
+ipcMain.handle('list-libraries', () => listLibraries());
+ipcMain.handle('get-current-library-id', () => getCurrentLibraryId());
+ipcMain.handle('set-current-library-id', (_, id) => setCurrentLibraryId(id));
+ipcMain.handle('create-library', (_, opts) => {
+  const lib = createLibrary(opts);
+  // Newly created library's folder must be servable immediately, same as an
+  // Explorer-linked directory — no restart required.
+  for (const base of [getLibraryBase(lib.id), getArtworkBase(lib.id)]) {
+    if (!explorerAllowedBases.includes(base)) explorerAllowedBases.push(base);
+  }
+  return lib;
+});
+ipcMain.handle('rename-library', (_, id, name) => renameLibrary(id, name));
+
+ipcMain.handle('get-library-storage-format', (_, libraryId) =>
+  getStorageFormat(libraryId ?? getCurrentLibraryId())
+);
+ipcMain.handle('convert-storage-format', (_, libraryId, newFormat) =>
+  convertStorageFormat(libraryId ?? getCurrentLibraryId(), newFormat)
+);
+
+// ── Move database ────────────────────────────────────────────────────────────
+// Unlike move-library (which relocates audio files while the DB stays open),
+// the database file itself can't be relocated while better-sqlite3 has it
+// open — close it, move it, record the new location, then restart.
+ipcMain.handle('get-db-path', () => getDbPath(app.getPath('userData')));
+ipcMain.handle('move-database', async (_, newDir) => {
+  const oldPath = getDbPath(app.getPath('userData'));
+  const newPath = path.join(newDir, path.basename(oldPath));
+  if (newPath === oldPath) throw new Error('Same location selected.');
+  if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+
+  closeDB();
+  // WAL/SHM sidecar files must move with the main db file, if present.
+  for (const suffix of ['', '-wal', '-shm']) {
+    const src = oldPath + suffix;
+    if (fs.existsSync(src)) moveFileSafe(src, newPath + suffix);
+  }
+  setDbPath(app.getPath('userData'), newPath);
+  app.relaunch();
+  app.exit(0);
 });
 
 ipcMain.handle('normalize-library', () => {
@@ -828,14 +893,14 @@ ipcMain.handle('open-dir-dialog', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
   return result.canceled ? null : result.filePaths[0];
 });
-ipcMain.handle('import-audio-files', async (event, filePaths, playlistId) => {
+ipcMain.handle('import-audio-files', async (event, filePaths, playlistId, libraryId) => {
   console.log('Importing audio files:', filePaths);
   const trackIds = [];
   const total = filePaths.length;
 
   for (let i = 0; i < total; i++) {
     try {
-      const trackId = await importAudioFile(filePaths[i]);
+      const trackId = await importAudioFile(filePaths[i], {}, libraryId);
       trackIds.push(trackId);
     } catch (err) {
       console.error('Import failed:', filePaths[i], err);
@@ -856,10 +921,14 @@ ipcMain.handle('import-audio-files', async (event, filePaths, playlistId) => {
   return trackIds;
 });
 
-ipcMain.handle('clear-library', async () => {
-  const audioBase = path.join(app.getPath('userData'), 'audio');
-  clearTracks();
-  clearPlaylists();
+ipcMain.handle('clear-library', async (_, libraryId) => {
+  // Clears only the specified library's tracks and its audio folder — other
+  // libraries are untouched. Playlists are left alone: they may reference
+  // tracks from other libraries too, and cascade delete already removes this
+  // library's (now-deleted) tracks from any playlist_tracks rows.
+  const id = libraryId ?? getCurrentLibraryId();
+  const audioBase = getLibraryBase(id);
+  clearTracksForLibrary(id);
   if (fs.existsSync(audioBase)) fs.rmSync(audioBase, { recursive: true, force: true });
   if (global.mainWindow) {
     global.mainWindow.webContents.send('library-updated');
@@ -951,7 +1020,8 @@ ipcMain.handle('auto-tag-search', async (_, { query }) => {
 
 ipcMain.handle('fetch-artwork-url', async (_, { trackId, url }) => {
   try {
-    const artworkBase = getArtworkBase();
+    const track = getTrackById(trackId);
+    const artworkBase = getArtworkBase(track?.library_id ?? getCurrentLibraryId());
     fs.mkdirSync(artworkBase, { recursive: true });
 
     const res = await fetch(url);

@@ -225,6 +225,7 @@ function LibraryRow({
   mediaPort,
   newTrackIds,
   onAnimationEnd,
+  libraryNames,
 }) {
   const t = tracks[index];
   if (!t) {
@@ -313,6 +314,11 @@ function LibraryRow({
                 🔗
               </span>
             ) : null}
+            {libraryNames?.has(t.library_id) ? (
+              <span className="cell-library-badge" title={`Library: ${libraryNames.get(t.library_id)}`}>
+                {libraryNames.get(t.library_id)}
+              </span>
+            ) : null}
             <span className="cell-title-text">{t.title}</span>
           </div>
         ) : (
@@ -342,6 +348,7 @@ function SortableRow({
   mediaPort,
   isNew,
   onAnimationEnd,
+  libraryNames,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: t.id,
@@ -425,6 +432,11 @@ function SortableRow({
                 🔗
               </span>
             ) : null}
+            {libraryNames?.has(t.library_id) ? (
+              <span className="cell-library-badge" title={`Library: ${libraryNames.get(t.library_id)}`}>
+                {libraryNames.get(t.library_id)}
+              </span>
+            ) : null}
             <span className="cell-title-text">{t.title}</span>
           </div>
         ) : (
@@ -470,6 +482,15 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     reloadCurrentTrack,
     updateQueue,
   } = usePlayer();
+
+  // Multiple libraries are all shown together (#390) — only worth labeling
+  // tracks by library once there's more than one to distinguish.
+  const [libraryNames, setLibraryNames] = useState(new Map());
+  useEffect(() => {
+    window.api.listLibraries().then((libs) => {
+      setLibraryNames(libs.length > 1 ? new Map(libs.map((l) => [l.id, l.name])) : new Map());
+    });
+  }, []);
 
   // Only highlight a track as "playing" when the source context matches this view.
   // Library view: only highlight when played from library (currentPlaylistId === null).
@@ -1432,6 +1453,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                         mediaPort={mediaPort}
                         isNew={newTrackIds.has(t.id)}
                         onAnimationEnd={handleRowAnimationEnd}
+                        libraryNames={libraryNames}
                       />
                     ))}
                   </div>
@@ -1479,6 +1501,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                 mediaPort,
                 newTrackIds,
                 onAnimationEnd: handleRowAnimationEnd,
+                libraryNames,
               }}
             />
           )}

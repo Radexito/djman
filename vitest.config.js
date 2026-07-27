@@ -25,6 +25,7 @@ export default defineConfig({
             'src/__tests__/trackRepository.test.js',
             'src/__tests__/playlistRepository.test.js',
             'src/__tests__/cuePointRepository.test.js',
+            'src/__tests__/libraryRepository.test.js',
           ],
           setupFiles: ['./src/__tests__/setup.js'],
         },
@@ -36,6 +37,7 @@ export default defineConfig({
           environment: 'node',
           include: [
             'src/__tests__/importManager.test.js',
+            'src/__tests__/dbLocation.test.js',
             'src/__tests__/ytDlpManager.test.js',
             'src/__tests__/mediaServer.test.js',
             'src/__tests__/anlzWriter.test.js',

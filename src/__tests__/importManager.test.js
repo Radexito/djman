@@ -43,6 +43,24 @@ vi.mock('../db/settingsRepository.js', () => ({
   getSetting: vi.fn().mockReturnValue(null),
 }));
 
+// libraryRepository mock — a single library (id 1) is both "current" and
+// "default" (oldest) unless a test overrides it, matching a fresh single-
+// library install.
+const mockLibraries = new Map([[1, { id: 1, name: 'Default', root_path: null, storage_format: 'hashed' }]]);
+const mockGetLibrary = vi.fn((id) => mockLibraries.get(id));
+const mockGetCurrentLibraryId = vi.fn(() => 1);
+const mockGetDefaultLibraryId = vi.fn(() => 1);
+const mockSetLibraryStorageFormat = vi.fn((id, format) => {
+  const lib = mockLibraries.get(id);
+  if (lib) lib.storage_format = format;
+});
+vi.mock('../db/libraryRepository.js', () => ({
+  getLibrary: (...args) => mockGetLibrary(...args),
+  getCurrentLibraryId: (...args) => mockGetCurrentLibraryId(...args),
+  getDefaultLibraryId: (...args) => mockGetDefaultLibraryId(...args),
+  setLibraryStorageFormat: (...args) => mockSetLibraryStorageFormat(...args),
+}));
+
 vi.mock('../db/cuePointRepository.js', () => ({
   getCuePoints: vi.fn().mockReturnValue([]),
   addCuePoint: vi.fn().mockReturnValue(1),
@@ -109,6 +127,8 @@ vi.mock('../db/trackRepository.js', () => ({
 }));
 
 // Import AFTER mocks so the module picks up all stubs
+import path from 'path';
+import fs from 'fs';
 import { importAudioFile } from '../audio/importManager.js';
 import cryptoDefault from 'crypto';
 
@@ -119,6 +139,12 @@ beforeEach(() => {
   mockAddTrack.mockReturnValue(99);
   mockGetTrackByHash.mockReturnValue(undefined);
   mockExecFile.mockImplementation((bin, args, cb) => cb(null, '', ''));
+  mockLibraries.clear();
+  mockLibraries.set(1, { id: 1, name: 'Default', root_path: null, storage_format: 'hashed' });
+  mockGetLibrary.mockImplementation((id) => mockLibraries.get(id));
+  mockGetCurrentLibraryId.mockReturnValue(1);
+  mockGetDefaultLibraryId.mockReturnValue(1);
+  fs.existsSync.mockReset().mockReturnValue(false);
   // Restore default hash implementation after clearAllMocks
   cryptoDefault.createHash.mockImplementation(() => ({
     update() {
@@ -319,5 +345,95 @@ describe('importAudioFile — artist detection from filename', () => {
     expect(mockAddTrack.mock.calls[0][0].artist).toBe('Filename Artist');
     // ID3 title wins over filename-derived title
     expect(mockAddTrack.mock.calls[0][0].title).toBe('ID3 Title');
+  });
+});
+
+// ── Multiple libraries (#390 rework) ──────────────────────────────────────────
+
+describe('importAudioFile — library scoping', () => {
+  it('stores library_id from the current library when none is passed explicitly', async () => {
+    mockGetCurrentLibraryId.mockReturnValue(1);
+    await importAudioFile('/music/song.mp3');
+    expect(mockAddTrack.mock.calls[0][0].library_id).toBe(1);
+  });
+
+  it('stores library_id from an explicit argument, overriding the current library', async () => {
+    mockLibraries.set(2, { id: 2, name: 'Second', root_path: null, storage_format: 'hashed' });
+    await importAudioFile('/music/song.mp3', {}, 2);
+    expect(mockAddTrack.mock.calls[0][0].library_id).toBe(2);
+  });
+
+  it("uses the non-default library's scoped default folder, not the shared userData/audio path", async () => {
+    mockLibraries.set(2, { id: 2, name: 'Second', root_path: null, storage_format: 'hashed' });
+    await importAudioFile('/music/song.mp3', {}, 2);
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toContain(path.join('libraries', '2', 'audio'));
+  });
+
+  it("uses the default (oldest) library's unscoped audio path for backward compatibility", async () => {
+    await importAudioFile('/music/song.mp3', {}, 1);
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(path.join('/tmp/djman-test', 'audio', 'de', `${FAKE_HASH}.mp3`));
+  });
+});
+
+describe('importAudioFile — readable storage format', () => {
+  it('names the file "<artist>/<artist> - <title>.<ext>" instead of a hash path', async () => {
+    mockLibraries.get(1).storage_format = 'readable';
+
+    await importAudioFile('/music/song.mp3');
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(
+      path.join('/tmp/djman-test', 'audio', 'Test Artist', 'Test Artist - Test Song.mp3')
+    );
+  });
+
+  it('sanitizes filesystem-unsafe characters in artist/title', async () => {
+    mockLibraries.get(1).storage_format = 'readable';
+    ffprobe.mockResolvedValueOnce({
+      format: {
+        format_name: 'mp3',
+        duration: '180.0',
+        bit_rate: '320000',
+        tags: { title: 'Track: Part 2?', artist: 'A/B*C' },
+      },
+      streams: [],
+    });
+
+    await importAudioFile('/music/song.mp3');
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(
+      path.join('/tmp/djman-test', 'audio', 'A_B_C', 'A_B_C - Track_ Part 2_.mp3')
+    );
+  });
+
+  it('disambiguates a filename collision with a different track', async () => {
+    mockLibraries.get(1).storage_format = 'readable';
+    // Simulate: the plain "Artist - Title.mp3" path already exists (a
+    // different track, since true duplicates are caught by the hash check
+    // before this point), so it should fall back to the "(2)" suffix.
+    fs.existsSync.mockImplementation((p) => !p.includes('(2)'));
+
+    await importAudioFile('/music/song.mp3');
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(
+      path.join('/tmp/djman-test', 'audio', 'Test Artist', 'Test Artist - Test Song (2).mp3')
+    );
+  });
+
+  it("only affects the library it's set on — other libraries keep their own format", async () => {
+    mockLibraries.set(2, { id: 2, name: 'Second', root_path: null, storage_format: 'hashed' });
+    mockLibraries.get(1).storage_format = 'readable';
+
+    await importAudioFile('/music/song.mp3', {}, 2);
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    // Library 2 stayed hashed — unaffected by library 1's format
+    expect(destPath).toBe(
+      path.join('/tmp/djman-test', 'libraries', '2', 'audio', 'de', `${FAKE_HASH}.mp3`)
+    );
   });
 });
