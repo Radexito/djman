@@ -46,7 +46,9 @@ vi.mock('../db/settingsRepository.js', () => ({
 // libraryRepository mock — a single library (id 1) is both "current" and
 // "default" (oldest) unless a test overrides it, matching a fresh single-
 // library install.
-const mockLibraries = new Map([[1, { id: 1, name: 'Default', root_path: null, storage_format: 'hashed' }]]);
+const mockLibraries = new Map([
+  [1, { id: 1, name: 'Default', root_path: null, storage_format: 'hashed' }],
+]);
 const mockGetLibrary = vi.fn((id) => mockLibraries.get(id));
 const mockGetCurrentLibraryId = vi.fn(() => 1);
 const mockGetDefaultLibraryId = vi.fn(() => 1);

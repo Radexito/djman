@@ -225,7 +225,8 @@ export function initDB() {
   // becomes orphaned. Safe to run every startup — only acts once.
   const libraryCount = db.prepare('SELECT COUNT(*) AS n FROM libraries').get().n;
   if (libraryCount === 0) {
-    const getOldSetting = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value ?? null;
+    const getOldSetting = (key) =>
+      db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value ?? null;
     const rootPath = getOldSetting('library_path');
     const storageFormat = getOldSetting('storage_format') === 'readable' ? 'readable' : 'hashed';
     const info = db

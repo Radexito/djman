@@ -286,7 +286,10 @@ function SettingsModal({ onClose }) {
 
   const handleCreateLibrary = async () => {
     if (!newLibraryName.trim()) return;
-    await window.api.createLibrary({ name: newLibraryName.trim(), storageFormat: newLibraryFormat });
+    await window.api.createLibrary({
+      name: newLibraryName.trim(),
+      storageFormat: newLibraryFormat,
+    });
     setNewLibraryName('');
     setNewLibraryFormat('hashed');
     refreshLibraries();
@@ -352,9 +355,8 @@ function SettingsModal({ onClose }) {
               <div className="settings-group">
                 <div className="settings-group-title">Libraries</div>
                 <p className="settings-group-desc">
-                  All libraries are active at once — tracks from every library show up together
-                  in your Music Library. "Current" only controls which library new imports land
-                  in.
+                  All libraries are active at once — tracks from every library show up together in
+                  your Music Library. "Current" only controls which library new imports land in.
                 </p>
 
                 <div className="library-list">
@@ -496,10 +498,7 @@ function SettingsModal({ onClose }) {
                           <button className="btn-primary" onClick={handleConfirmFormatChange}>
                             Convert
                           </button>
-                          <button
-                            className="btn-secondary"
-                            onClick={() => setConfirmFormat(null)}
-                          >
+                          <button className="btn-secondary" onClick={() => setConfirmFormat(null)}>
                             Cancel
                           </button>
                         </div>
@@ -545,8 +544,8 @@ function SettingsModal({ onClose }) {
               <div className="settings-group">
                 <div className="settings-group-title">Database Location</div>
                 <p className="settings-group-desc">
-                  Where the single shared database file lives (all libraries' tracks,
-                  playlists, and settings). Moving it closes and restarts the app.
+                  Where the single shared database file lives (all libraries' tracks, playlists, and
+                  settings). Moving it closes and restarts the app.
                 </p>
                 <div className="settings-row settings-row-action">
                   <div className="settings-path-display" title={dbPath}>
@@ -1126,9 +1125,9 @@ function SettingsModal({ onClose }) {
                   <div>
                     <div className="settings-action-label">Clear Library</div>
                     <div className="settings-action-desc">
-                      Removes all tracks and audio files from the current library only (see
-                      Library settings for which one that is). Other libraries and your playlists
-                      are left alone — a playlist may still reference tracks from other libraries.
+                      Removes all tracks and audio files from the current library only (see Library
+                      settings for which one that is). Other libraries and your playlists are left
+                      alone — a playlist may still reference tracks from other libraries.
                     </div>
                   </div>
                   {confirmClear === 'library' ? (

@@ -33,7 +33,12 @@ export function createLibrary({ name, rootPath = null, storageFormat = 'hashed' 
     .prepare(
       'INSERT INTO libraries (name, root_path, storage_format, created_at) VALUES (?, ?, ?, ?)'
     )
-    .run(name?.trim() || 'New Library', rootPath, storageFormat === 'readable' ? 'readable' : 'hashed', Date.now());
+    .run(
+      name?.trim() || 'New Library',
+      rootPath,
+      storageFormat === 'readable' ? 'readable' : 'hashed',
+      Date.now()
+    );
   return getLibrary(info.lastInsertRowid);
 }
 

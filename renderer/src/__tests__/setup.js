@@ -9,7 +9,9 @@ window.api = {
   listLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Default', storage_format: 'hashed' }]),
   getCurrentLibraryId: vi.fn().mockResolvedValue(1),
   setCurrentLibraryId: vi.fn().mockResolvedValue(undefined),
-  createLibrary: vi.fn().mockResolvedValue({ id: 2, name: 'New Library', storage_format: 'hashed' }),
+  createLibrary: vi
+    .fn()
+    .mockResolvedValue({ id: 2, name: 'New Library', storage_format: 'hashed' }),
   renameLibrary: vi.fn().mockResolvedValue({ id: 1, name: 'Renamed' }),
   getLibraryStorageFormat: vi.fn().mockResolvedValue('hashed'),
   convertStorageFormat: vi.fn().mockResolvedValue({ moved: 0, total: 0 }),

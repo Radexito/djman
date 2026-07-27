@@ -315,7 +315,10 @@ function LibraryRow({
               </span>
             ) : null}
             {libraryNames?.has(t.library_id) ? (
-              <span className="cell-library-badge" title={`Library: ${libraryNames.get(t.library_id)}`}>
+              <span
+                className="cell-library-badge"
+                title={`Library: ${libraryNames.get(t.library_id)}`}
+              >
                 {libraryNames.get(t.library_id)}
               </span>
             ) : null}
@@ -433,7 +436,10 @@ function SortableRow({
               </span>
             ) : null}
             {libraryNames?.has(t.library_id) ? (
-              <span className="cell-library-badge" title={`Library: ${libraryNames.get(t.library_id)}`}>
+              <span
+                className="cell-library-badge"
+                title={`Library: ${libraryNames.get(t.library_id)}`}
+              >
                 {libraryNames.get(t.library_id)}
               </span>
             ) : null}
