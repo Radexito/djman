@@ -39,8 +39,10 @@ vi.mock('child_process', () => ({
   execFile: (...args) => mockExecFile(...args),
 }));
 
+const mockGetSetting = vi.fn().mockReturnValue(null);
 vi.mock('../db/settingsRepository.js', () => ({
-  getSetting: vi.fn().mockReturnValue(null),
+  getSetting: (...args) => mockGetSetting(...args),
+  setSetting: vi.fn(),
 }));
 
 vi.mock('../db/cuePointRepository.js', () => ({
@@ -109,6 +111,8 @@ vi.mock('../db/trackRepository.js', () => ({
 }));
 
 // Import AFTER mocks so the module picks up all stubs
+import path from 'path';
+import fs from 'fs';
 import { importAudioFile } from '../audio/importManager.js';
 import cryptoDefault from 'crypto';
 
@@ -118,6 +122,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockAddTrack.mockReturnValue(99);
   mockGetTrackByHash.mockReturnValue(undefined);
+  mockGetSetting.mockReturnValue(null);
   mockExecFile.mockImplementation((bin, args, cb) => cb(null, '', ''));
   // Restore default hash implementation after clearAllMocks
   cryptoDefault.createHash.mockImplementation(() => ({
@@ -319,5 +324,51 @@ describe('importAudioFile — artist detection from filename', () => {
     expect(mockAddTrack.mock.calls[0][0].artist).toBe('Filename Artist');
     // ID3 title wins over filename-derived title
     expect(mockAddTrack.mock.calls[0][0].title).toBe('ID3 Title');
+  });
+});
+
+describe('importAudioFile — readable storage format', () => {
+  beforeEach(() => {
+    mockGetSetting.mockImplementation((key, def) => (key === 'storage_format' ? 'readable' : def));
+  });
+
+  it('names the file "<artist>/<artist> - <title>.<ext>" instead of a hash path', async () => {
+    await importAudioFile('/music/song.mp3');
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(path.join('/tmp/djman-test', 'audio', 'Test Artist', 'Test Artist - Test Song.mp3'));
+  });
+
+  it('sanitizes filesystem-unsafe characters in artist/title', async () => {
+    ffprobe.mockResolvedValueOnce({
+      format: {
+        format_name: 'mp3',
+        duration: '180.0',
+        bit_rate: '320000',
+        tags: { title: 'Track: Part 2?', artist: 'A/B*C' },
+      },
+      streams: [],
+    });
+
+    await importAudioFile('/music/song.mp3');
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(
+      path.join('/tmp/djman-test', 'audio', 'A_B_C', 'A_B_C - Track_ Part 2_.mp3')
+    );
+  });
+
+  it('disambiguates a filename collision with a different track', async () => {
+    // Simulate: the plain "Artist - Title.mp3" path already exists (a
+    // different track, since true duplicates are caught by the hash check
+    // before this point), so it should fall back to the "(2)" suffix.
+    fs.existsSync.mockImplementation((p) => !p.includes('(2)'));
+
+    await importAudioFile('/music/song.mp3');
+
+    const destPath = mockAddTrack.mock.calls[0][0].file_path;
+    expect(destPath).toBe(
+      path.join('/tmp/djman-test', 'audio', 'Test Artist', 'Test Artist - Test Song (2).mp3')
+    );
   });
 });

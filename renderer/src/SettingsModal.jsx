@@ -46,6 +46,19 @@ function SettingsModal({ onClose }) {
   const [moveProgress, setMoveProgress] = useState(null); // { moved, total, pct } | null
   const [confirmMove, setConfirmMove] = useState(null); // pending new dir path
 
+  // Storage format (hashed vs. readable)
+  const [storageFormat, setStorageFormat] = useState('hashed');
+  const [convertProgress, setConvertProgress] = useState(null); // { moved, total, pct } | null
+  const [confirmFormat, setConfirmFormat] = useState(null); // pending target format
+
+  // Multiple libraries
+  const [libraries, setLibraries] = useState([]);
+  const [activeLibraryId, setActiveLibraryId] = useState(null);
+  const [newLibraryName, setNewLibraryName] = useState('');
+  const [confirmSwitchId, setConfirmSwitchId] = useState(null); // pending library id
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameInput, setRenameInput] = useState('');
+
   // Escape key closes dialog
   const handleKeyDown = useCallback(
     (e) => {
@@ -75,6 +88,9 @@ function SettingsModal({ onClose }) {
   useEffect(() => {
     if (activeSection === 'library') {
       window.api.getLibraryPath().then(setLibraryPath);
+      window.api.getStorageFormat().then(setStorageFormat);
+      window.api.listLibraries().then(setLibraries);
+      window.api.getActiveLibrary().then((lib) => setActiveLibraryId(lib?.id ?? null));
     }
     if (activeSection === 'updates') {
       window.api.getDepVersions().then(setDepVersions);
@@ -242,6 +258,44 @@ function SettingsModal({ onClose }) {
     }
   };
 
+  const handleConfirmFormatChange = async () => {
+    const newFormat = confirmFormat;
+    setConfirmFormat(null);
+    setConvertProgress({ moved: 0, total: 0, pct: 0 });
+    const unsub = window.api.onConvertStorageFormatProgress((data) => setConvertProgress(data));
+    try {
+      await window.api.convertStorageFormat(newFormat);
+      setStorageFormat(newFormat);
+      setConvertProgress(null);
+    } finally {
+      unsub?.();
+    }
+  };
+
+  const handleCreateLibrary = async () => {
+    if (!newLibraryName.trim()) return;
+    const created = await window.api.createLibrary(newLibraryName.trim());
+    setNewLibraryName('');
+    setLibraries(await window.api.listLibraries());
+    setConfirmSwitchId(created.id);
+  };
+
+  const handleConfirmSwitch = async () => {
+    const id = confirmSwitchId;
+    setConfirmSwitchId(null);
+    await window.api.switchLibrary(id); // restarts the app
+  };
+
+  const handleConfirmRename = async () => {
+    if (!renameInput.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    await window.api.renameLibrary(renamingId, renameInput.trim());
+    setLibraries(await window.api.listLibraries());
+    setRenamingId(null);
+  };
+
   const sections = [
     { id: 'library', label: 'Library' },
     { id: 'normalization', label: 'Normalization' },
@@ -309,6 +363,137 @@ function SettingsModal({ onClose }) {
                       Move
                     </button>
                     <button className="btn-secondary" onClick={() => setConfirmMove(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="settings-group">
+                <div className="settings-group-title">Storage Format</div>
+                <p className="settings-group-desc">
+                  <b>Hashed</b> stores files under a content-hash name (opaque, but
+                  collision/duplicate-proof). <b>Readable</b> uses an "Artist - Title" folder
+                  layout instead, while still hashing content to avoid storing true duplicates
+                  twice. Changing this reorganizes every file already in the library.
+                </p>
+                <div className="settings-row">
+                  <label className="settings-radio">
+                    <input
+                      type="radio"
+                      checked={storageFormat === 'hashed'}
+                      disabled={!!convertProgress}
+                      onChange={() => storageFormat !== 'hashed' && setConfirmFormat('hashed')}
+                    />
+                    Hashed (default)
+                  </label>
+                  <label className="settings-radio">
+                    <input
+                      type="radio"
+                      checked={storageFormat === 'readable'}
+                      disabled={!!convertProgress}
+                      onChange={() => storageFormat !== 'readable' && setConfirmFormat('readable')}
+                    />
+                    Readable
+                  </label>
+                </div>
+                {convertProgress && (
+                  <div className="move-progress">
+                    <div className="move-progress-label">
+                      Reorganizing files… {convertProgress.moved}/{convertProgress.total} (
+                      {convertProgress.pct}%)
+                    </div>
+                    <div className="deps-bar-track">
+                      <div className="deps-bar-fill" style={{ width: `${convertProgress.pct}%` }} />
+                    </div>
+                  </div>
+                )}
+                {confirmFormat && (
+                  <div className="settings-confirm-row" style={{ marginTop: '0.75rem' }}>
+                    <span>
+                      Convert every file to <b>{confirmFormat}</b> layout?
+                    </span>
+                    <button className="btn-primary" onClick={handleConfirmFormatChange}>
+                      Convert
+                    </button>
+                    <button className="btn-secondary" onClick={() => setConfirmFormat(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="settings-group">
+                <div className="settings-group-title">Libraries</div>
+                <p className="settings-group-desc">
+                  Each library is fully separate — its own tracks, playlists, and cue points.
+                  Switching libraries restarts the app.
+                </p>
+                <div className="library-list">
+                  {libraries.map((lib) => (
+                    <div key={lib.id} className="library-list-row">
+                      {renamingId === lib.id ? (
+                        <input
+                          autoFocus
+                          className="library-rename-input"
+                          value={renameInput}
+                          onChange={(e) => setRenameInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleConfirmRename()}
+                          onBlur={handleConfirmRename}
+                        />
+                      ) : (
+                        <span className="library-list-name">
+                          {lib.name}
+                          {lib.id === activeLibraryId && (
+                            <span className="library-active-badge">active</span>
+                          )}
+                        </span>
+                      )}
+                      <div className="library-list-actions">
+                        <button
+                          className="btn-secondary"
+                          onClick={() => {
+                            setRenamingId(lib.id);
+                            setRenameInput(lib.name);
+                          }}
+                        >
+                          Rename
+                        </button>
+                        {lib.id !== activeLibraryId && (
+                          <button
+                            className="btn-secondary"
+                            onClick={() => setConfirmSwitchId(lib.id)}
+                          >
+                            Switch to…
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="settings-row settings-row-action" style={{ marginTop: '0.75rem' }}>
+                  <input
+                    className="library-rename-input"
+                    placeholder="New library name…"
+                    value={newLibraryName}
+                    onChange={(e) => setNewLibraryName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateLibrary()}
+                  />
+                  <button className="btn-secondary" onClick={handleCreateLibrary}>
+                    + New Library
+                  </button>
+                </div>
+                {confirmSwitchId && (
+                  <div className="settings-confirm-row" style={{ marginTop: '0.75rem' }}>
+                    <span>
+                      Switch to{' '}
+                      <b>{libraries.find((l) => l.id === confirmSwitchId)?.name ?? '…'}</b>? The
+                      app will restart.
+                    </span>
+                    <button className="btn-primary" onClick={handleConfirmSwitch}>
+                      Switch &amp; Restart
+                    </button>
+                    <button className="btn-secondary" onClick={() => setConfirmSwitchId(null)}>
                       Cancel
                     </button>
                   </div>

@@ -90,6 +90,17 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('move-library-progress', (_, data) => cb(data));
     return () => ipcRenderer.removeAllListeners('move-library-progress');
   },
+  listLibraries: () => ipcRenderer.invoke('list-libraries'),
+  getActiveLibrary: () => ipcRenderer.invoke('get-active-library'),
+  createLibrary: (name) => ipcRenderer.invoke('create-library', name),
+  renameLibrary: (id, name) => ipcRenderer.invoke('rename-library', id, name),
+  switchLibrary: (id) => ipcRenderer.invoke('switch-library', id),
+  getStorageFormat: () => ipcRenderer.invoke('get-storage-format'),
+  convertStorageFormat: (newFormat) => ipcRenderer.invoke('convert-storage-format', newFormat),
+  onConvertStorageFormatProgress: (cb) => {
+    ipcRenderer.on('convert-storage-format-progress', (_, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('convert-storage-format-progress');
+  },
   normalizeLibrary: () => ipcRenderer.invoke('normalize-library'),
   getNormalizedCount: () => ipcRenderer.invoke('get-normalized-count'),
   normalizeTracksAudio: (payload) => ipcRenderer.invoke('normalize-tracks-audio', payload),

@@ -14,14 +14,22 @@ import {
   getTrackByHash,
   getTracksByPaths,
   updateTrackWaveform,
+  getTracks,
 } from '../db/trackRepository.js';
 import { getAnalyzerRuntimePath } from '../deps.js';
-import { getSetting } from '../db/settingsRepository.js';
+import { getSetting, setSetting } from '../db/settingsRepository.js';
+import { moveFileSafe } from '../utils/fsMove.js';
+import { getActiveLibrary } from '../db/libraryRegistry.js';
 import { generateCuePoints } from './cueGen.js';
 import { getCuePoints, addCuePoint } from '../db/cuePointRepository.js';
 import { generateWaveformOverview } from './waveformGenerator.js';
 
 const execFileAsync = promisify(execFile);
+
+// Resolved once at process startup, same as database.js's own dbPath — the
+// active library doesn't change without a full app restart (see
+// libraryRegistry.js and database.js).
+const activeLibrary = await getActiveLibrary();
 
 // ─── Analysis progress tracking ─────────────────────────────────────────────
 
@@ -63,20 +71,118 @@ function hashFile(filePath) {
   });
 }
 
+// The 'default' library keeps the original, unscoped default paths so
+// existing installs see no change on upgrade. Any additional library gets
+// its own scoped default so two libraries never silently share a folder.
+function defaultAudioBase() {
+  if (activeLibrary.id === 'default') return path.join(app.getPath('userData'), 'audio');
+  return path.join(app.getPath('userData'), 'libraries', activeLibrary.id, 'audio');
+}
+
+function defaultArtworkBase() {
+  if (activeLibrary.id === 'default') return path.join(app.getPath('userData'), 'artwork');
+  return path.join(app.getPath('userData'), 'libraries', activeLibrary.id, 'artwork');
+}
+
 export function getLibraryBase() {
   const custom = getSetting('library_path');
-  return custom || path.join(app.getPath('userData'), 'audio');
+  return custom || defaultAudioBase();
 }
 
 export function getArtworkBase() {
-  return path.join(app.getPath('userData'), 'artwork');
+  return defaultArtworkBase();
 }
 
-function getAudioStoragePath(hash, ext) {
+export function getStorageFormat() {
+  return getSetting('storage_format', 'hashed') === 'readable' ? 'readable' : 'hashed';
+}
+
+// Windows/macOS/Linux all reject at least these characters in filenames.
+function sanitizeForFilename(s) {
+  const cleaned = (s || '').replace(/[\\/:*?"<>|]/g, '_').trim();
+  return cleaned || 'Unknown';
+}
+
+/**
+ * Where a track's audio file should live, given the library's current storage
+ * format setting. `meta.artist`/`meta.title` are only used for 'readable'
+ * mode — true duplicate content is already caught by the file-hash check in
+ * importAudioFile before this is called, so a filename collision here means
+ * a *different* track happens to share the same artist/title and just needs
+ * a disambiguating suffix.
+ */
+function getAudioStoragePath(hash, ext, meta = {}) {
   const base = getLibraryBase();
+  if (getStorageFormat() === 'readable') {
+    const artist = sanitizeForFilename(meta.artist);
+    const title = sanitizeForFilename(meta.title);
+    const artistDir = path.join(base, artist);
+    fs.mkdirSync(artistDir, { recursive: true });
+    let candidate = path.join(artistDir, `${artist} - ${title}${ext}`);
+    for (let n = 2; fs.existsSync(candidate); n++) {
+      candidate = path.join(artistDir, `${artist} - ${title} (${n})${ext}`);
+    }
+    return candidate;
+  }
   const shard = hash.slice(0, 2);
   fs.mkdirSync(path.join(base, shard), { recursive: true });
   return path.join(base, shard, `${hash}${ext}`);
+}
+
+/**
+ * Re-lay-out every track's physical file to match `newFormat`, reusing the
+ * same move-with-EXDEV-fallback approach as moving a library. Reported
+ * progress mirrors the move-library IPC event shape.
+ */
+export function convertStorageFormat(newFormat) {
+  if (newFormat !== 'hashed' && newFormat !== 'readable') {
+    throw new Error(`Unknown storage format: ${newFormat}`);
+  }
+  if (newFormat === getStorageFormat()) return { moved: 0, total: 0 };
+
+  const tracks = getTracks({ limit: 999999 });
+  const total = tracks.length;
+  let moved = 0;
+
+  const oldBase = getLibraryBase();
+  // Persist first so getAudioStoragePath() (called below via getStorageFormat())
+  // computes every destination in the new layout.
+  setSetting('storage_format', newFormat);
+
+  for (const track of tracks) {
+    const oldPath = track.file_path;
+    if (fs.existsSync(oldPath)) {
+      const ext = path.extname(oldPath);
+      const newPath = getAudioStoragePath(track.file_hash, ext, {
+        artist: track.artist,
+        title: track.title,
+      });
+      if (newPath !== oldPath) {
+        moveFileSafe(oldPath, newPath);
+        updateTrack(track.id, { file_path: newPath });
+      }
+    }
+    moved++;
+    if (global.mainWindow) {
+      global.mainWindow.webContents.send('convert-storage-format-progress', {
+        moved,
+        total,
+        pct: Math.round((moved / total) * 100),
+      });
+    }
+  }
+
+  // Remove now-empty shard/artist dirs left behind (best-effort)
+  try {
+    for (const entry of fs.readdirSync(oldBase)) {
+      const d = path.join(oldBase, entry);
+      if (fs.statSync(d).isDirectory() && fs.readdirSync(d).length === 0) fs.rmdirSync(d);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return { moved, total };
 }
 
 async function extractArtwork(srcPath, hash) {
@@ -251,13 +357,10 @@ export async function importAudioFile(filePath, sourceMeta = {}) {
     return existing.id;
   }
 
-  const dest = getAudioStoragePath(hash, ext);
-
-  if (!fs.existsSync(dest)) {
-    fs.copyFileSync(filePath, dest);
-  }
-
-  const probe = await ffprobe(dest);
+  // Probe the SOURCE file (not yet copied) — 'readable' storage format needs
+  // artist/title to name the destination file, so tags must be known before
+  // getAudioStoragePath() is called.
+  const probe = await ffprobe(filePath);
   const format = ext.slice(1).toLowerCase();
   const duration = Number(probe.format.duration);
   const bitrate = Number(probe.format.bit_rate);
@@ -280,6 +383,15 @@ export async function importAudioFile(filePath, sourceMeta = {}) {
   // Last-resort fallback: use channel/uploader name as artist when still empty
   if (!resolvedArtist && sourceMeta.channel) {
     resolvedArtist = sourceMeta.channel;
+  }
+
+  const dest = getAudioStoragePath(hash, ext, {
+    artist: resolvedArtist,
+    title: resolvedTitle || basename,
+  });
+
+  if (!fs.existsSync(dest)) {
+    fs.copyFileSync(filePath, dest);
   }
 
   // Extract embedded album art (best-effort, non-blocking)

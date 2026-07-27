@@ -77,7 +77,16 @@ import {
   spawnAnalysis,
   cancelAnalysis,
   getLibraryBase,
+  getStorageFormat,
+  convertStorageFormat,
 } from './audio/importManager.js';
+import {
+  listLibraries,
+  createLibrary,
+  renameLibrary,
+  setActiveLibrary,
+  getActiveLibrary,
+} from './db/libraryRegistry.js';
 import { convertAudio } from './audio/ffmpeg.js';
 
 import {
@@ -131,6 +140,7 @@ const __dirname = path.dirname(__filename);
 let mainWindow;
 
 import { startMediaServer as _startMediaServer } from './audio/mediaServer.js';
+import { moveFileSafe } from './utils/fsMove.js';
 import { getArtworkBase } from './audio/importManager.js';
 import { writeId3Tags } from './audio/id3Writer.js';
 
@@ -424,16 +434,7 @@ ipcMain.handle('move-library', async (event, newDir) => {
     const rel = path.relative(oldBase, oldPath);
     const newPath = path.join(newDir, rel);
     fs.mkdirSync(path.dirname(newPath), { recursive: true });
-    try {
-      fs.renameSync(oldPath, newPath);
-    } catch (err) {
-      // rename() is a same-filesystem metadata op — it can't cross drive
-      // letters (e.g. moving the library to an external drive), so fall
-      // back to copy + delete whenever the destination is a different volume.
-      if (err.code !== 'EXDEV') throw err;
-      fs.copyFileSync(oldPath, newPath);
-      fs.unlinkSync(oldPath);
-    }
+    moveFileSafe(oldPath, newPath);
     updateTrack(track.id, { file_path: newPath });
     moved++;
 
@@ -459,6 +460,26 @@ ipcMain.handle('move-library', async (event, newDir) => {
   if (!explorerAllowedBases.includes(newDir)) explorerAllowedBases.push(newDir);
   return { moved, total };
 });
+
+// ── Multiple libraries ───────────────────────────────────────────────────────
+// Each library is a fully separate database file (see libraryRegistry.js and
+// database.js) — only one is open per process, so switching requires a full
+// app restart. The library's own root folder and storage format are ordinary
+// settings *inside* that library's database, so they switch automatically
+// with no separate bookkeeping here.
+
+ipcMain.handle('list-libraries', () => listLibraries());
+ipcMain.handle('get-active-library', () => getActiveLibrary());
+ipcMain.handle('create-library', (_, name) => createLibrary(name));
+ipcMain.handle('rename-library', (_, id, name) => renameLibrary(id, name));
+ipcMain.handle('switch-library', async (_, id) => {
+  await setActiveLibrary(id);
+  app.relaunch();
+  app.exit(0);
+});
+
+ipcMain.handle('get-storage-format', () => getStorageFormat());
+ipcMain.handle('convert-storage-format', (_, newFormat) => convertStorageFormat(newFormat));
 
 ipcMain.handle('normalize-library', () => {
   const targetLufs = Number(getSetting('normalize_target_lufs', '-9'));
@@ -857,7 +878,9 @@ ipcMain.handle('import-audio-files', async (event, filePaths, playlistId) => {
 });
 
 ipcMain.handle('clear-library', async () => {
-  const audioBase = path.join(app.getPath('userData'), 'audio');
+  // getLibraryBase(), not a hardcoded path — the active library may be using
+  // a custom or per-library-scoped folder (see libraryRegistry.js).
+  const audioBase = getLibraryBase();
   clearTracks();
   clearPlaylists();
   if (fs.existsSync(audioBase)) fs.rmSync(audioBase, { recursive: true, force: true });

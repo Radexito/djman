@@ -41,6 +41,15 @@ window.api = {
   getNormalizedCount: vi.fn().mockResolvedValue(0),
   getLibraryPath: vi.fn().mockResolvedValue('/tmp/audio'),
   moveLibrary: vi.fn().mockResolvedValue({ moved: 0, total: 0 }),
+  getStorageFormat: vi.fn().mockResolvedValue('hashed'),
+  convertStorageFormat: vi.fn().mockResolvedValue({ moved: 0, total: 0 }),
+  listLibraries: vi.fn().mockResolvedValue([{ id: 'default', name: 'Default', dbFile: 'library.db' }]),
+  getActiveLibrary: vi
+    .fn()
+    .mockResolvedValue({ id: 'default', name: 'Default', dbFile: 'library.db' }),
+  createLibrary: vi.fn().mockResolvedValue({ id: 'new', name: 'New Library', dbFile: 'library-new.db' }),
+  renameLibrary: vi.fn().mockResolvedValue({ id: 'default', name: 'Renamed', dbFile: 'library.db' }),
+  switchLibrary: vi.fn().mockResolvedValue(undefined),
   openDirDialog: vi.fn().mockResolvedValue(null),
   getDepVersions: vi.fn().mockResolvedValue({}),
   checkDepUpdates: vi.fn().mockResolvedValue({}),
@@ -59,6 +68,7 @@ window.api = {
   onOpenSettings: vi.fn().mockImplementation(noop),
   onDepsProgress: vi.fn().mockImplementation(noop),
   onMoveLibraryProgress: vi.fn().mockImplementation(noop),
+  onConvertStorageFormatProgress: vi.fn().mockImplementation(noop),
   onExportM3UProgress: vi.fn().mockImplementation(noop),
   onImportProgress: vi.fn().mockImplementation(noop),
   onNormalizeProgress: vi.fn().mockImplementation(noop),

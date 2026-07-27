@@ -430,3 +430,67 @@
   font-size: 12px;
   line-height: 1.4;
 }
+
+/* Storage format radios */
+.settings-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #cdd6f4;
+  cursor: pointer;
+  margin-right: 20px;
+}
+.settings-radio input[type='radio'] {
+  accent-color: #1db954;
+  cursor: pointer;
+}
+
+/* Libraries list */
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.library-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #1e1e2e;
+  border: 1px solid #313244;
+  border-radius: 6px;
+}
+.library-list-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cdd6f4;
+}
+.library-active-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #1db954;
+  border: 1px solid #1db954;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.library-list-actions {
+  display: flex;
+  gap: 6px;
+}
+.library-rename-input {
+  flex: 1;
+  padding: 6px 8px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 5px;
+  color: #f0f0f0;
+  font-size: 13px;
+}
+.library-rename-input:focus {
+  outline: none;
+  border-color: #2d6aa0;
+}

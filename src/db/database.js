@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import Database from 'better-sqlite3';
+import { getActiveLibrary } from './libraryRegistry.js';
 
 let dbPath;
 
@@ -11,7 +12,11 @@ if (process.env.DB_PATH) {
   // Try to use Electron's app.getPath('userData') if available
   try {
     const { app } = await import('electron');
-    dbPath = path.join(app.getPath('userData'), 'library.db');
+    // Multiple libraries are separate DB files (see libraryRegistry.js) — the
+    // active one is chosen once at startup; switching libraries restarts the
+    // app rather than re-opening this module's connection at runtime.
+    const active = await getActiveLibrary();
+    dbPath = path.join(app.getPath('userData'), active.dbFile);
   } catch {
     // Node test mode: put database in project folder
     dbPath = path.join(process.cwd(), 'library.db');
