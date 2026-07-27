@@ -19,6 +19,20 @@ const IMAGE_MIME = {
 };
 
 /**
+ * Pipe a file stream to the HTTP response, destroying the response instead of
+ * crashing the process if the file disappears mid-read (e.g. a USB drive is
+ * unplugged while a track is streaming). Headers are already sent by this
+ * point, so the only option on error is to end the connection cleanly.
+ */
+export function streamFile(stream, res) {
+  stream.on('error', (err) => {
+    if (err.code !== 'ENOENT') console.error('[media-server] stream error:', err.message);
+    res.destroy();
+  });
+  stream.pipe(res);
+}
+
+/**
  * Build the HTTP request handler that serves audio files from `audioBase`
  * and optionally artwork files from `artworkBase`.
  * `allowedBases` is a mutable array; entries added at runtime are respected immediately.
@@ -72,7 +86,7 @@ export function createMediaRequestHandler(audioBase, artworkBase = null, allowed
           'Accept-Ranges': 'bytes',
           'Content-Length': String(end - start + 1),
         });
-        fs.createReadStream(urlPath, { start, end }).pipe(res);
+        streamFile(fs.createReadStream(urlPath, { start, end }), res);
       } else {
         res.writeHead(200, {
           ...corsHeaders,
@@ -80,7 +94,7 @@ export function createMediaRequestHandler(audioBase, artworkBase = null, allowed
           'Accept-Ranges': 'bytes',
           'Content-Length': String(total),
         });
-        fs.createReadStream(urlPath).pipe(res);
+        streamFile(fs.createReadStream(urlPath), res);
       }
     } catch (err) {
       if (err.code !== 'ENOENT') console.error('[media-server] error:', err.message);

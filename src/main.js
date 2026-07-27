@@ -411,6 +411,14 @@ ipcMain.handle('retry-deps', () => {
 });
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
 ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
+// Linked (Explorer-referenced) tracks point at arbitrary, often removable paths
+// (USB drives, etc.) — check which ones are currently unreachable so the UI can
+// gray them out instead of failing playback with no explanation.
+ipcMain.handle('get-unavailable-linked-tracks', () =>
+  getLinkedTracksBasic()
+    .filter((t) => !fs.existsSync(t.file_path))
+    .map((t) => t.id)
+);
 ipcMain.handle('get-track-waveform', (_, trackId) => {
   const buf = getTrackWaveform(trackId);
   return buf ? new Uint8Array(buf) : null;

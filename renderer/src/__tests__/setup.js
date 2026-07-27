@@ -18,6 +18,7 @@ window.api = {
   onConvertStorageFormatProgress: vi.fn().mockImplementation(noop),
   getDbPath: vi.fn().mockResolvedValue('/tmp/library.db'),
   moveDatabase: vi.fn().mockResolvedValue(undefined),
+  getUnavailableLinkedTracks: vi.fn().mockResolvedValue([]),
   getCuePoints: vi.fn().mockResolvedValue([]),
   addCuePoint: vi.fn().mockResolvedValue({ id: 1 }),
   updateCuePoint: vi.fn().mockResolvedValue({ ok: true }),

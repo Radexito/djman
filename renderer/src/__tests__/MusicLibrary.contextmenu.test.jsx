@@ -24,6 +24,7 @@ vi.mock('../PlayerContext.jsx', () => ({
     currentTrack: null,
     currentPlaylistId: null,
     updateQueue: vi.fn(),
+    unavailableLinkedIds: new Set(),
   }),
 }));
 

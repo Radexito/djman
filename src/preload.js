@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   // Track library
   getTracks: (params) => ipcRenderer.invoke('get-tracks', params),
   getTrackIds: (params) => ipcRenderer.invoke('get-track-ids', params),
+  getUnavailableLinkedTracks: () => ipcRenderer.invoke('get-unavailable-linked-tracks'),
   getTrackWaveform: (trackId) => ipcRenderer.invoke('get-track-waveform', trackId),
   onWaveformReady: (cb) => {
     const handler = (_, data) => cb(data);
