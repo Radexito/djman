@@ -145,7 +145,10 @@ let mediaServerPort = null;
 const explorerAllowedBases = [];
 
 function startMediaServer() {
-  const audioBase = path.join(app.getPath('userData'), 'audio');
+  // Respect a relocated library (Settings → move library / external drive):
+  // getLibraryBase() falls back to userData/audio only when no custom
+  // library_path setting is stored.
+  const audioBase = getLibraryBase();
   const artworkBase = getArtworkBase();
   return _startMediaServer(audioBase, artworkBase, explorerAllowedBases).then(({ port }) => {
     mediaServerPort = port;
@@ -399,8 +402,11 @@ ipcMain.handle('move-library', async (event, newDir) => {
 
   if (!newDir || newDir === oldBase) throw new Error('Same directory selected.');
 
-  // Ensure destination exists
-  fs.mkdirSync(newDir, { recursive: true });
+  // Ensure destination exists. Skip mkdir entirely if it's already there —
+  // Windows rejects CreateDirectory on a drive root (e.g. "U:\") with EPERM
+  // even though the directory obviously exists, so `recursive: true` alone
+  // doesn't help when the user picks a drive root as the new library folder.
+  if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
 
   // Gather all tracks
   const tracks = getTracks({ limit: 999999 });
@@ -418,7 +424,16 @@ ipcMain.handle('move-library', async (event, newDir) => {
     const rel = path.relative(oldBase, oldPath);
     const newPath = path.join(newDir, rel);
     fs.mkdirSync(path.dirname(newPath), { recursive: true });
-    fs.renameSync(oldPath, newPath);
+    try {
+      fs.renameSync(oldPath, newPath);
+    } catch (err) {
+      // rename() is a same-filesystem metadata op — it can't cross drive
+      // letters (e.g. moving the library to an external drive), so fall
+      // back to copy + delete whenever the destination is a different volume.
+      if (err.code !== 'EXDEV') throw err;
+      fs.copyFileSync(oldPath, newPath);
+      fs.unlinkSync(oldPath);
+    }
     updateTrack(track.id, { file_path: newPath });
     moved++;
 
@@ -439,6 +454,9 @@ ipcMain.handle('move-library', async (event, newDir) => {
   }
 
   setSetting('library_path', newDir);
+  // The running media server's audioBase was fixed at startup — allow the new
+  // location immediately so playback doesn't require an app restart.
+  if (!explorerAllowedBases.includes(newDir)) explorerAllowedBases.push(newDir);
   return { moved, total };
 });
 

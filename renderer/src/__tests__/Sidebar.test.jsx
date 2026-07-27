@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor, act } from '@testing-library/react';
 import Sidebar from '../Sidebar.jsx';
 import { DownloadProvider } from '../DownloadContext.jsx';
 import { TidalDownloadProvider } from '../TidalDownloadContext.jsx';
@@ -156,15 +156,17 @@ describe('Sidebar — import dialog playlist association', () => {
     window.api.createPlaylist.mockResolvedValueOnce({ id: 7 });
 
     renderSidebar({ ...defaultProps });
-    fireEvent.click(screen.getByText('Import Audio Files'));
+    fireEvent.click(screen.getByText('Import'));
 
-    await waitFor(() => screen.getByText('Import to Playlist'));
+    const dialog = (await waitFor(() => screen.getByText('Import to Playlist'))).closest(
+      '.ipd-modal'
+    );
 
     fireEvent.click(screen.getByRole('radio', { name: /Create new playlist/ }));
     fireEvent.change(screen.getByPlaceholderText('New playlist name'), {
       target: { value: 'My New Set' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
 
     await waitFor(() => {
       expect(window.api.createPlaylist).toHaveBeenCalledWith('My New Set');
@@ -182,11 +184,13 @@ describe('Sidebar — import dialog playlist association', () => {
     renderSidebar({ ...defaultProps });
     await waitFor(() => screen.getByText('Techno Set'));
 
-    fireEvent.click(screen.getByText('Import Audio Files'));
-    await waitFor(() => screen.getByText('Import to Playlist'));
+    fireEvent.click(screen.getByText('Import'));
+    const dialog = (await waitFor(() => screen.getByText('Import to Playlist'))).closest(
+      '.ipd-modal'
+    );
 
     fireEvent.click(screen.getByRole('radio', { name: /Techno Set/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
 
     await waitFor(() => {
       expect(window.api.importAudioFiles).toHaveBeenCalledWith(['/tmp/track.mp3'], 42);
@@ -197,11 +201,13 @@ describe('Sidebar — import dialog playlist association', () => {
     window.api.selectAudioFiles.mockResolvedValueOnce(['/tmp/track.mp3']);
 
     renderSidebar({ ...defaultProps });
-    fireEvent.click(screen.getByText('Import Audio Files'));
-    await waitFor(() => screen.getByText('Import to Playlist'));
+    fireEvent.click(screen.getByText('Import'));
+    const dialog = (await waitFor(() => screen.getByText('Import to Playlist'))).closest(
+      '.ipd-modal'
+    );
 
     // "Library only" is the default — just click Import
-    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
 
     await waitFor(() => {
       expect(window.api.importAudioFiles).toHaveBeenCalledWith(['/tmp/track.mp3'], null);
