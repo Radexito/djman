@@ -6,6 +6,7 @@ const noop = () => () => {}; // returns unsubscribe fn
 window.api = {
   getTracks: vi.fn().mockResolvedValue([]),
   getTrackIds: vi.fn().mockResolvedValue([]),
+  getUnavailableLinkedTracks: vi.fn().mockResolvedValue([]),
   getCuePoints: vi.fn().mockResolvedValue([]),
   addCuePoint: vi.fn().mockResolvedValue({ id: 1 }),
   updateCuePoint: vi.fn().mockResolvedValue({ ok: true }),
