@@ -356,6 +356,33 @@ function _fetchPlaylistInfoOnce(url, options = {}) {
 }
 
 /**
+ * Search YouTube by keyword using yt-dlp's `ytsearchN:` pseudo-URL support
+ * (no extra binary/config needed — --flat-playlist already returns entries
+ * for a search "playlist" the same way it does for a real one).
+ *
+ * @param {string} query
+ * @param {{ limit?: number }} [options]
+ * @returns {Promise<Array<{source:'youtube', type:'track', id, title, artist, album, durationSec, quality, url}>>}
+ */
+export async function searchYouTube(query, options = {}) {
+  const limit = options.limit ?? 20;
+  const info = await fetchPlaylistInfo(`ytsearch${limit}:${query}`);
+  return info.entries
+    .filter((e) => !e.unavailable)
+    .map((e) => ({
+      source: 'youtube',
+      type: 'track',
+      id: e.id,
+      title: e.title,
+      artist: '',
+      album: '',
+      durationSec: e.duration ?? null,
+      quality: '',
+      url: e.url,
+    }));
+}
+
+/**
  * Download audio from a URL using yt-dlp.
  * Supports both single tracks and playlists — always resolves with an array of file results.
  *
