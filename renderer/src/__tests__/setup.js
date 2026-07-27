@@ -113,6 +113,7 @@ window.api = {
   linkDirectory: vi.fn().mockResolvedValue({ ok: true, linked: 0, total: 0 }),
   remapTrack: vi.fn().mockResolvedValue({ ok: true }),
   remapFolder: vi.fn().mockResolvedValue({ ok: true, count: 0 }),
+  moveTrackToLibrary: vi.fn().mockResolvedValue({ ok: true, moved: true }),
   checkLinkedTrackStatus: vi.fn().mockResolvedValue([]),
   getLinkedTracksBasic: vi.fn().mockResolvedValue([]),
   checkUsbFormat: vi

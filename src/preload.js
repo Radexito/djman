@@ -258,6 +258,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('link-directory', { dirPath, recursive, playlistId }),
   remapTrack: (trackId, newPath) => ipcRenderer.invoke('remap-track', { trackId, newPath }),
   remapFolder: (oldDir) => ipcRenderer.invoke('remap-folder', { oldDir }),
+  moveTrackToLibrary: (trackId, targetLibraryId) =>
+    ipcRenderer.invoke('move-track-to-library', { trackId, targetLibraryId }),
   checkLinkedTrackStatus: (trackIds) => ipcRenderer.invoke('check-linked-track-status', trackIds),
   getLinkedTracksBasic: () => ipcRenderer.invoke('get-linked-tracks-basic'),
 

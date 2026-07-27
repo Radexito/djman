@@ -128,10 +128,15 @@ vi.mock('../db/trackRepository.js', () => ({
   getTrackById: (...args) => mockGetTrackById(...args),
 }));
 
+const mockMoveFileSafe = vi.fn();
+vi.mock('../utils/fsMove.js', () => ({
+  moveFileSafe: (...args) => mockMoveFileSafe(...args),
+}));
+
 // Import AFTER mocks so the module picks up all stubs
 import path from 'path';
 import fs from 'fs';
-import { importAudioFile } from '../audio/importManager.js';
+import { importAudioFile, moveTrackToLibrary } from '../audio/importManager.js';
 import cryptoDefault from 'crypto';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -147,6 +152,8 @@ beforeEach(() => {
   mockGetCurrentLibraryId.mockReturnValue(1);
   mockGetDefaultLibraryId.mockReturnValue(1);
   fs.existsSync.mockReset().mockReturnValue(false);
+  mockMoveFileSafe.mockReset();
+  mockGetTrackById.mockReset();
   // Restore default hash implementation after clearAllMocks
   cryptoDefault.createHash.mockImplementation(() => ({
     update() {
@@ -437,5 +444,134 @@ describe('importAudioFile — readable storage format', () => {
     expect(destPath).toBe(
       path.join('/tmp/djman-test', 'libraries', '2', 'audio', 'de', `${FAKE_HASH}.mp3`)
     );
+  });
+});
+
+// ── Moving a track between libraries (#393) ───────────────────────────────────
+
+describe('moveTrackToLibrary', () => {
+  beforeEach(() => {
+    mockLibraries.set(2, { id: 2, name: 'Second', root_path: null, storage_format: 'hashed' });
+  });
+
+  it('moves an owned (non-linked) track: relocates the file and updates library_id', async () => {
+    fs.existsSync.mockReturnValue(true);
+    mockGetTrackById.mockReturnValue({
+      id: 5,
+      file_path: '/old/lib/audio/de/deadbeef.mp3',
+      file_hash: FAKE_HASH,
+      is_linked: 0,
+      library_id: 1,
+      artist: 'A',
+      title: 'T',
+      artwork_path: null,
+    });
+
+    const result = await moveTrackToLibrary(5, 2);
+
+    expect(result.ok).toBe(true);
+    expect(result.moved).toBe(true);
+    expect(mockMoveFileSafe).toHaveBeenCalledOnce();
+    expect(fs.copyFileSync).not.toHaveBeenCalled();
+    expect(mockUpdateTrack).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ library_id: 2, is_linked: 0 })
+    );
+  });
+
+  it('is a no-op when the track already belongs to the target library and is not linked', async () => {
+    fs.existsSync.mockReturnValue(true);
+    mockGetTrackById.mockReturnValue({
+      id: 5,
+      file_path: '/old/lib/audio/de/deadbeef.mp3',
+      file_hash: FAKE_HASH,
+      is_linked: 0,
+      library_id: 2,
+    });
+
+    const result = await moveTrackToLibrary(5, 2);
+
+    expect(result).toEqual({ ok: true, moved: false });
+    expect(mockUpdateTrack).not.toHaveBeenCalled();
+    expect(mockMoveFileSafe).not.toHaveBeenCalled();
+  });
+
+  it('imports a linked track into a library: copies (does not delete) the source file', async () => {
+    fs.existsSync.mockReturnValue(true);
+    mockGetTrackById.mockReturnValue({
+      id: 6,
+      file_path: '/usb/drive/track.mp3',
+      file_hash: null,
+      is_linked: 1,
+      library_id: 1,
+      artist: 'A',
+      title: 'T',
+      artwork_path: null,
+    });
+
+    const result = await moveTrackToLibrary(6, 2);
+
+    expect(result.ok).toBe(true);
+    expect(fs.copyFileSync).toHaveBeenCalled();
+    expect(mockMoveFileSafe).not.toHaveBeenCalled();
+    expect(mockUpdateTrack).toHaveBeenCalledWith(
+      6,
+      expect.objectContaining({ library_id: 2, is_linked: 0, file_hash: FAKE_HASH })
+    );
+  });
+
+  it('merges into an existing track when the same content already lives in the target library', async () => {
+    fs.existsSync.mockReturnValue(true);
+    mockGetTrackById.mockReturnValue({
+      id: 6,
+      file_path: '/usb/drive/track.mp3',
+      file_hash: null,
+      is_linked: 1,
+      library_id: 1,
+    });
+    mockGetTrackByHash.mockReturnValue({
+      id: 42,
+      library_id: 2,
+      file_path: '/lib2/audio/de/deadbeef.mp3',
+    });
+
+    const result = await moveTrackToLibrary(6, 2);
+
+    expect(result.mergedWithExisting).toBe(true);
+    expect(fs.copyFileSync).not.toHaveBeenCalled();
+    expect(mockUpdateTrack).toHaveBeenCalledWith(
+      6,
+      expect.objectContaining({ file_path: '/lib2/audio/de/deadbeef.mp3', library_id: 2 })
+    );
+  });
+
+  it('throws when the source file no longer exists on disk', async () => {
+    fs.existsSync.mockReturnValue(false);
+    mockGetTrackById.mockReturnValue({
+      id: 5,
+      file_path: '/gone.mp3',
+      file_hash: FAKE_HASH,
+      is_linked: 0,
+      library_id: 1,
+    });
+
+    await expect(moveTrackToLibrary(5, 2)).rejects.toThrow('Source file not found');
+  });
+
+  it('throws when the track does not exist', async () => {
+    mockGetTrackById.mockReturnValue(undefined);
+    await expect(moveTrackToLibrary(999, 2)).rejects.toThrow('Track not found');
+  });
+
+  it('throws when the target library does not exist', async () => {
+    fs.existsSync.mockReturnValue(true);
+    mockGetTrackById.mockReturnValue({
+      id: 5,
+      file_path: '/old.mp3',
+      file_hash: FAKE_HASH,
+      is_linked: 0,
+      library_id: 1,
+    });
+    await expect(moveTrackToLibrary(5, 999)).rejects.toThrow('Target library not found');
   });
 });

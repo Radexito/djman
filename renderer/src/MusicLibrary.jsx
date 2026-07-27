@@ -320,8 +320,8 @@ function LibraryRow({
                 className={`cell-linked-badge${isUnavailable ? ' cell-linked-badge--offline' : ''}`}
                 title={
                   isUnavailable
-                    ? 'File not found — may be on a disconnected drive'
-                    : 'Explorer-linked file'
+                    ? `File not found — may be on a disconnected drive\n${t.file_path}`
+                    : `Explorer-linked file\n${t.file_path}`
                 }
               >
                 {isUnavailable ? '🔗⚠' : '🔗'}
@@ -451,8 +451,8 @@ function SortableRow({
                 className={`cell-linked-badge${isUnavailable ? ' cell-linked-badge--offline' : ''}`}
                 title={
                   isUnavailable
-                    ? 'File not found — may be on a disconnected drive'
-                    : 'Explorer-linked file'
+                    ? `File not found — may be on a disconnected drive\n${t.file_path}`
+                    : `Explorer-linked file\n${t.file_path}`
                 }
               >
                 {isUnavailable ? '🔗⚠' : '🔗'}

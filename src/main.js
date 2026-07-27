@@ -78,6 +78,7 @@ import {
   getLibraryBase,
   getStorageFormat,
   convertStorageFormat,
+  moveTrackToLibrary,
 } from './audio/importManager.js';
 import {
   listLibraries,
@@ -1854,6 +1855,12 @@ ipcMain.handle('remap-folder', async (_, { oldDir }) => {
   const count = remapTracksByPrefix(oldSep, newSep);
   if (!explorerAllowedBases.includes(newDir)) explorerAllowedBases.push(newDir);
   return { ok: true, count, newDir };
+});
+
+ipcMain.handle('move-track-to-library', async (_, { trackId, targetLibraryId }) => {
+  const result = await moveTrackToLibrary(trackId, targetLibraryId);
+  send('library-updated');
+  return result;
 });
 
 ipcMain.handle('check-linked-track-status', (_, trackIds) => {

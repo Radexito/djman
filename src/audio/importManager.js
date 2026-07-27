@@ -196,6 +196,72 @@ export function convertStorageFormat(libraryId, newFormat) {
   return { moved, total };
 }
 
+/**
+ * Move (or, for a linked track, import a copy of) one track into a different
+ * library. Updates the same track row in place so playlist membership, cue
+ * points, and rating all carry over untouched — only file_path/library_id
+ * (and is_linked, for a linked source) change.
+ */
+export async function moveTrackToLibrary(trackId, targetLibraryId) {
+  const track = getTrackById(trackId);
+  if (!track) throw new Error('Track not found');
+  const targetLib = getLibrary(targetLibraryId);
+  if (!targetLib) throw new Error('Target library not found');
+  if (!track.is_linked && Number(track.library_id) === Number(targetLibraryId)) {
+    return { ok: true, moved: false };
+  }
+
+  const oldPath = track.file_path;
+  if (!fs.existsSync(oldPath)) {
+    throw new Error('Source file not found on disk');
+  }
+  const wasLinked = !!track.is_linked;
+  const ext = path.extname(oldPath);
+  const hash = track.file_hash || (await hashFile(oldPath));
+
+  // If this exact content is already owned by the destination library, just
+  // point at that copy rather than duplicating it.
+  const dupe = getTrackByHash(hash);
+  if (dupe && dupe.id !== trackId && Number(dupe.library_id) === Number(targetLibraryId)) {
+    updateTrack(trackId, {
+      file_path: dupe.file_path,
+      file_hash: hash,
+      library_id: targetLibraryId,
+      is_linked: 0,
+    });
+    return { ok: true, moved: true, newPath: dupe.file_path, mergedWithExisting: true };
+  }
+
+  const dest = getAudioStoragePath(
+    hash,
+    ext,
+    { artist: track.artist, title: track.title },
+    targetLibraryId
+  );
+
+  if (dest !== oldPath) {
+    if (wasLinked) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(oldPath, dest);
+    } else {
+      moveFileSafe(oldPath, dest);
+    }
+  }
+
+  const artworkPath =
+    wasLinked && !track.artwork_path ? await extractArtwork(dest, hash, targetLibraryId) : null;
+
+  updateTrack(trackId, {
+    file_path: dest,
+    file_hash: hash,
+    library_id: targetLibraryId,
+    is_linked: 0,
+    ...(artworkPath ? { artwork_path: artworkPath, has_artwork: 1 } : {}),
+  });
+
+  return { ok: true, moved: true, newPath: dest };
+}
+
 async function extractArtwork(srcPath, hash, libraryId) {
   const artworkBase = getArtworkBase(libraryId);
   fs.mkdirSync(artworkBase, { recursive: true });
