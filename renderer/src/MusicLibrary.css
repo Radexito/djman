@@ -308,11 +308,6 @@
   flex-shrink: 0;
 }
 
-.cell-linked-badge--offline {
-  opacity: 1;
-  color: #f4a261;
-}
-
 /* New row: space slides open (scaleY), then content fades in */
 @keyframes rowSlideIn {
   0% {
