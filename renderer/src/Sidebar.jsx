@@ -46,6 +46,8 @@ function Sidebar({
   const [renameValue, setRenameValue] = useState('');
   const [dragOverPlaylistId, setDragOverPlaylistId] = useState(null);
   const [importDialogFiles, setImportDialogFiles] = useState(null); // pending files waiting for playlist selection
+  const [linkDialogFiles, setLinkDialogFiles] = useState(null); // pending files waiting for playlist selection (link mode)
+  const [linking, setLinking] = useState(false);
   const newInputRef = useRef(null);
   const renameInputRef = useRef(null);
 
@@ -102,6 +104,31 @@ function Sidebar({
     await window.api.importAudioFiles(files, playlistId);
     // Small delay so the user sees 100% before the bar disappears
     setTimeout(() => setImportProgress({ total: 0, completed: 0 }), 800);
+  };
+
+  const handleLink = async () => {
+    const files = await window.api.selectAudioFiles();
+    if (!files.length) return;
+    setLinkDialogFiles(files);
+  };
+
+  const handleLinkConfirm = async (choice) => {
+    const files = linkDialogFiles;
+    setLinkDialogFiles(null);
+    if (!files?.length) return;
+
+    let playlistId = null;
+
+    if (choice.type === 'create') {
+      const result = await window.api.createPlaylist(choice.name);
+      playlistId = result?.id ?? null;
+    } else if (choice.type === 'existing') {
+      playlistId = choice.id;
+    }
+
+    setLinking(true);
+    await window.api.linkAudioFiles(files, playlistId);
+    setLinking(false);
   };
 
   const handleCreatePlaylist = async (e) => {
@@ -347,6 +374,7 @@ function Sidebar({
             Importing {importProgress.completed} / {importProgress.total}…
           </div>
         )}
+        {linking && <div className="import-progress">Linking files…</div>}
         {analysisProgress && (
           <div className="normalize-progress-wrap">
             <div className="normalize-progress-label">
@@ -501,7 +529,14 @@ function Sidebar({
           </div>
         )}
         <button className="import-button" onClick={handleImport}>
-          Import Audio Files
+          Import
+        </button>
+        <button
+          className="link-button"
+          onClick={handleLink}
+          title="Reference files without copying them into the library"
+        >
+          Link
         </button>
       </div>
 
@@ -573,6 +608,16 @@ function Sidebar({
           playlists={playlists}
           onConfirm={handleImportConfirm}
           onCancel={() => setImportDialogFiles(null)}
+        />
+      )}
+
+      {linkDialogFiles && (
+        <ImportPlaylistDialog
+          playlists={playlists}
+          onConfirm={handleLinkConfirm}
+          onCancel={() => setLinkDialogFiles(null)}
+          title="Link to Playlist"
+          confirmLabel="Link"
         />
       )}
     </div>
