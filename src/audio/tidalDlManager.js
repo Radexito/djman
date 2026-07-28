@@ -173,7 +173,8 @@ try:
             'title': a.name,
             'artist': a.artist.name if a.artist else '',
             'album': a.name,
-            'duration': None,
+            'duration': getattr(a, 'duration', None),
+            'numTracks': getattr(a, 'num_tracks', None),
             'quality': getattr(a, 'audio_quality', None) or '',
             'url': f'https://tidal.com/browse/album/{a.id}',
         })
@@ -184,7 +185,8 @@ try:
             'title': p.name,
             'artist': '',
             'album': '',
-            'duration': None,
+            'duration': getattr(p, 'duration', None),
+            'numTracks': getattr(p, 'num_tracks', None),
             'quality': '',
             'url': f'https://tidal.com/browse/playlist/{p.id}',
         })

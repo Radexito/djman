@@ -1268,6 +1268,7 @@ ipcMain.handle('cloud-search', async (_event, { source, query, types, limit }) =
           artist: r.artist,
           album: r.album,
           durationSec: r.duration,
+          numTracks: r.numTracks,
           quality: r.quality,
           url: r.url,
         })),
