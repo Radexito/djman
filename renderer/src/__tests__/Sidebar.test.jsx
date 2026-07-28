@@ -59,6 +59,13 @@ describe('Sidebar', () => {
     expect(onMenuSelect).toHaveBeenCalledWith('music');
   });
 
+  it('calls onMenuSelect with help when Help is clicked', () => {
+    const onMenuSelect = vi.fn();
+    renderSidebar({ ...defaultProps, onMenuSelect });
+    fireEvent.click(screen.getByText('Help'));
+    expect(onMenuSelect).toHaveBeenCalledWith('help');
+  });
+
   it('calls onMenuSelect with playlist id when playlist is clicked', async () => {
     const onMenuSelect = vi.fn();
     window.api.getPlaylists.mockResolvedValueOnce([

@@ -6,6 +6,7 @@ import DownloadView from './DownloadView.jsx';
 import TidalDownloadView from './TidalDownloadView.jsx';
 import CloudSearchView from './CloudSearchView.jsx';
 import FileExplorerView from './FileExplorerView.jsx';
+import HelpView from './HelpView.jsx';
 import SettingsModal from './SettingsModal.jsx';
 import ExportModal from './ExportModal.jsx';
 import PlayerBar from './PlayerBar.jsx';
@@ -143,10 +144,12 @@ function App() {
               <FileExplorerView
                 style={{ display: selectedPlaylistId === 'explorer' ? '' : 'none' }}
               />
+              <HelpView style={{ display: selectedPlaylistId === 'help' ? '' : 'none' }} />
               {selectedPlaylistId !== 'download' &&
                 selectedPlaylistId !== 'tidal' &&
                 selectedPlaylistId !== 'cloud-search' &&
-                selectedPlaylistId !== 'explorer' && (
+                selectedPlaylistId !== 'explorer' &&
+                selectedPlaylistId !== 'help' && (
                   <MusicLibrary
                     selectedPlaylist={selectedPlaylistId}
                     search={search}
