@@ -38,6 +38,7 @@ export default defineConfig({
           include: [
             'src/__tests__/importManager.test.js',
             'src/__tests__/dbLocation.test.js',
+            'src/__tests__/autoTagger.test.js',
             'src/__tests__/ytDlpManager.test.js',
             'src/__tests__/tidalDlManager.test.js',
             'src/__tests__/mediaServer.test.js',
