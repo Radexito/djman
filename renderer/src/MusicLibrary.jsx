@@ -316,14 +316,14 @@ function LibraryRow({
             )}
             {t.is_linked ? (
               <span
-                className={`cell-linked-badge${isUnavailable ? ' cell-linked-badge--offline' : ''}`}
+                className="cell-linked-badge"
                 title={
                   isUnavailable
                     ? 'File not found — may be on a disconnected drive'
                     : 'Explorer-linked file'
                 }
               >
-                {isUnavailable ? '🔗⚠' : '🔗'}
+                🔗
               </span>
             ) : null}
             <span className="cell-title-text">{t.title}</span>
@@ -438,14 +438,14 @@ function SortableRow({
             )}
             {t.is_linked ? (
               <span
-                className={`cell-linked-badge${isUnavailable ? ' cell-linked-badge--offline' : ''}`}
+                className="cell-linked-badge"
                 title={
                   isUnavailable
                     ? 'File not found — may be on a disconnected drive'
                     : 'Explorer-linked file'
                 }
               >
-                {isUnavailable ? '🔗⚠' : '🔗'}
+                🔗
               </span>
             ) : null}
             <span className="cell-title-text">{t.title}</span>
