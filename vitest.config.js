@@ -47,6 +47,7 @@ export default defineConfig({
             'src/__tests__/pdbWriter.test.js',
             'src/__tests__/deviceFormats.test.js',
             'src/__tests__/ffmpegConvert.test.js',
+            'src/__tests__/exportReuse.test.js',
           ],
         },
       },

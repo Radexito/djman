@@ -116,6 +116,7 @@ import { writeAnlz, getAnlzFolder } from './audio/anlzWriter.js';
 import { writeSettingFiles } from './usb/settingWriter.js';
 import { writePdb } from './usb/pdbWriter.js';
 import { resolveExportFormat } from './usb/deviceFormats.js';
+import { reuseExistingUsbTrack } from './usb/exportReuse.js';
 import { getResetCleanupTargets, startResetCleanup } from './resetCleanup.js';
 import {
   getCuePoints,
@@ -2003,14 +2004,20 @@ ipcMain.handle(
       const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
       for (let i = 0; i < tracks.length; i++) {
         const t = tracks[i];
-        const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
-          useNormalized,
-          targetLufs,
-          targetDevice,
-          forceMp3,
-        });
-        usbPaths.set(t.id, usbPath);
-        if (meta) usbMeta.set(t.id, meta);
+        const reused = reuseExistingUsbTrack(existingTracks, t.id, usedNames);
+        if (reused) {
+          usbPaths.set(t.id, reused.path);
+          if (reused.meta) usbMeta.set(t.id, reused.meta);
+        } else {
+          const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
+            useNormalized,
+            targetLufs,
+            targetDevice,
+            forceMp3,
+          });
+          usbPaths.set(t.id, usbPath);
+          if (meta) usbMeta.set(t.id, meta);
+        }
         send('export-rekordbox-progress', {
           msg: `Copying files… ${i + 1}/${total}`,
           pct: Math.round(((i + 1) / total) * 40),
@@ -2155,14 +2162,20 @@ ipcMain.handle(
       const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
       for (let i = 0; i < allTracks.length; i++) {
         const t = allTracks[i];
-        const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
-          useNormalized,
-          targetLufs,
-          targetDevice,
-          forceMp3,
-        });
-        usbPaths.set(t.id, usbPath);
-        if (meta) usbMeta.set(t.id, meta);
+        const reused = reuseExistingUsbTrack(existingTracks, t.id, usedNames);
+        if (reused) {
+          usbPaths.set(t.id, reused.path);
+          if (reused.meta) usbMeta.set(t.id, reused.meta);
+        } else {
+          const { path: usbPath, meta } = await copyTrackToUsb(t, usbRoot, usedNames, {
+            useNormalized,
+            targetLufs,
+            targetDevice,
+            forceMp3,
+          });
+          usbPaths.set(t.id, usbPath);
+          if (meta) usbMeta.set(t.id, meta);
+        }
         send('export-all-progress', {
           msg: `Copying files… ${i + 1}/${total}`,
           pct: Math.round(((i + 1) / total) * 35),
