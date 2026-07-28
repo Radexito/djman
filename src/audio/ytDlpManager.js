@@ -182,7 +182,7 @@ async function checkYouTubeAvailability(entries, onProgress, onEntryChecked) {
         'availability',
         '--no-warnings',
         '--extractor-args',
-        'youtube:player_client=web',
+        'youtube:player_client=android_vr,web',
         `https://www.youtube.com/watch?v=${entry.id}`,
       ];
       const proc = spawn(ytDlp, args);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'events';
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }));
@@ -12,14 +12,56 @@ vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
 }));
 
-// child_process.spawn mock — captures the args it was called with and lets
-// each test control stdout/exit behavior via a fake EventEmitter-based process.
+// child_process.spawn mock. Two modes, selected per-test via `fakeProc`:
+//  - manual: a test sets `fakeProc` before invoking the code under test and
+//    drives stdout/close itself (used by searchYouTube tests, which assert
+//    on state between individual emit calls)
+//  - auto: when no fakeProc is set, responds like the real yt-dlp binary
+//    would for the calls fetchPlaylistInfo makes (--dump-single-json /
+//    availability), used by the checkYouTubeAvailability tests
+const spawnCalls = [];
 let lastSpawnArgs = null;
-let fakeProc;
+let fakeProc = null;
+
 vi.mock('child_process', () => ({
-  spawn: vi.fn((bin, args) => {
+  spawn: vi.fn((_cmd, args) => {
+    spawnCalls.push(args);
     lastSpawnArgs = args;
-    return fakeProc;
+
+    if (fakeProc) {
+      return fakeProc;
+    }
+
+    const proc = new EventEmitter();
+    proc.stdout = new EventEmitter();
+    proc.stderr = new EventEmitter();
+    proc.kill = vi.fn();
+
+    queueMicrotask(() => {
+      if (args.includes('--dump-single-json')) {
+        proc.stdout.emit(
+          'data',
+          Buffer.from(
+            JSON.stringify({
+              title: 'Test Playlist',
+              entries: [
+                {
+                  id: 'abc123',
+                  title: 'Track 1',
+                  webpage_url: 'https://youtube.com/watch?v=abc123',
+                  duration: 100,
+                },
+              ],
+            })
+          )
+        );
+      } else if (args.includes('availability')) {
+        proc.stdout.emit('data', Buffer.from('public'));
+      }
+      proc.emit('close', 0);
+    });
+
+    return proc;
   }),
 }));
 
@@ -30,7 +72,8 @@ function makeFakeProc() {
   return proc;
 }
 
-import { detectPlatform, searchYouTube } from '../audio/ytDlpManager.js';
+import fs from 'fs';
+import { detectPlatform, fetchPlaylistInfo, searchYouTube } from '../audio/ytDlpManager.js';
 
 describe('detectPlatform', () => {
   it('returns youtube for youtube.com URLs', () => {
@@ -65,8 +108,12 @@ describe('detectPlatform', () => {
 // ── Cloud Search (#376) — YouTube side ────────────────────────────────────────
 
 describe('searchYouTube', () => {
-  it('spawns yt-dlp with a ytsearchN: pseudo-URL and maps results to the shared result shape', async () => {
+  beforeEach(() => {
+    spawnCalls.length = 0;
     fakeProc = makeFakeProc();
+  });
+
+  it('spawns yt-dlp with a ytsearchN: pseudo-URL and maps results to the shared result shape', async () => {
     const resultPromise = searchYouTube('daft punk', { limit: 5 });
 
     fakeProc.stdout.emit(
@@ -105,7 +152,6 @@ describe('searchYouTube', () => {
   });
 
   it('filters out unavailable entries', async () => {
-    fakeProc = makeFakeProc();
     const resultPromise = searchYouTube('some query');
 
     fakeProc.stdout.emit(
@@ -125,12 +171,36 @@ describe('searchYouTube', () => {
   });
 
   it('defaults to a limit of 20 results when none is specified', async () => {
-    fakeProc = makeFakeProc();
     const resultPromise = searchYouTube('some query');
     fakeProc.stdout.emit('data', JSON.stringify({ entries: [] }));
     fakeProc.emit('close', 0);
     await resultPromise;
 
     expect(lastSpawnArgs).toContain('ytsearch20:some query');
+  });
+});
+
+// Regression for #404: the per-entry availability check used player_client=web
+// only, which fails format resolution for most videos (YouTube's SABR-streaming/
+// PO-token enforcement on the web client) and was misread as "unavailable".
+describe('checkYouTubeAvailability (via fetchPlaylistInfo)', () => {
+  beforeEach(() => {
+    spawnCalls.length = 0;
+    fakeProc = null;
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+  });
+
+  it('probes availability using the android_vr,web extractor client', async () => {
+    await fetchPlaylistInfo('https://www.youtube.com/playlist?list=xyz');
+
+    const availabilityCall = spawnCalls.find((args) => args.includes('availability'));
+    expect(availabilityCall).toBeDefined();
+    const clientArgIndex = availabilityCall.indexOf('--extractor-args');
+    expect(availabilityCall[clientArgIndex + 1]).toBe('youtube:player_client=android_vr,web');
+  });
+
+  it('does not flag a publicly-available entry as unavailable', async () => {
+    const info = await fetchPlaylistInfo('https://www.youtube.com/playlist?list=xyz');
+    expect(info.entries[0].unavailable).toBe(false);
   });
 });
