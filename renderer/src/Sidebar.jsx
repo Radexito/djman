@@ -529,7 +529,11 @@ function Sidebar({
             Exporting {exportProgress.copied} / {exportProgress.total}… ({exportProgress.pct}%)
           </div>
         )}
-        <button className="import-button" onClick={handleImport}>
+        <button
+          className="import-button"
+          onClick={handleImport}
+          title="Copy audio files into the library"
+        >
           Import
         </button>
         <button
