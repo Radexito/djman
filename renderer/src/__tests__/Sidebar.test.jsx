@@ -144,6 +144,37 @@ describe('Sidebar', () => {
     renderSidebar({ ...defaultProps });
     expect(screen.queryByText(/Export USB/)).toBeNull();
   });
+
+  it('does not flip the Color submenu when opened in the top-left of the screen', async () => {
+    window.api.getPlaylists.mockResolvedValueOnce([
+      { id: 1, name: 'Techno Set', color: null, track_count: 0, total_duration: 0 },
+    ]);
+
+    const { container } = renderSidebar({ ...defaultProps });
+    await waitFor(() => screen.getByText('Techno Set'));
+    fireEvent.contextMenu(screen.getByText('Techno Set'), { clientX: 50, clientY: 50 });
+
+    const menu = container.querySelector('.context-menu');
+    expect(menu).not.toHaveClass('context-menu--flip-left');
+    expect(menu).not.toHaveClass('context-menu--flip-up');
+  });
+
+  it('flips the Color submenu left and up when opened near the bottom-right of the screen', async () => {
+    window.api.getPlaylists.mockResolvedValueOnce([
+      { id: 1, name: 'Techno Set', color: null, track_count: 0, total_duration: 0 },
+    ]);
+
+    const { container } = renderSidebar({ ...defaultProps });
+    await waitFor(() => screen.getByText('Techno Set'));
+    fireEvent.contextMenu(screen.getByText('Techno Set'), {
+      clientX: window.innerWidth - 10,
+      clientY: window.innerHeight - 10,
+    });
+
+    const menu = container.querySelector('.context-menu');
+    expect(menu).toHaveClass('context-menu--flip-left');
+    expect(menu).toHaveClass('context-menu--flip-up');
+  });
 });
 
 describe('Sidebar — import dialog playlist association', () => {
