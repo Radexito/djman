@@ -32,6 +32,16 @@ function App() {
     setSearch(`ARTIST is ${artist}`);
   };
 
+  const handleLogoClick = () => {
+    setSelectedPlaylistId('music');
+    setSearch('');
+  };
+
+  const handleMenuSelect = (id) => {
+    if (id === 'music' && selectedPlaylistId === 'music') setSearch('');
+    setSelectedPlaylistId(id);
+  };
+
   useEffect(() => {
     const unsub = window.api.onOpenSettings(() => setShowSettings(true));
     return unsub;
@@ -113,11 +123,12 @@ function App() {
               search={search}
               onSearchChange={setSearch}
               onOpenSettings={() => setShowSettings(true)}
+              onLogoClick={handleLogoClick}
             />
             <div className="app-main">
               <Sidebar
                 selectedMenuItemId={selectedPlaylistId}
-                onMenuSelect={setSelectedPlaylistId}
+                onMenuSelect={handleMenuSelect}
                 activePlaylistId={selectedPlaylistId}
                 onExportPlaylistRekordboxUsb={(id) =>
                   setExportState({ playlistId: id, mode: 'rekordbox' })
