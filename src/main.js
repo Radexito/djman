@@ -18,6 +18,11 @@ import { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, shell } from 'elec
 app.name = 'Dj Manager';
 
 if (process.platform === 'linux') {
+  // Must match `desktopName` in package.json / the packaged .desktop file's basename —
+  // this is what Wayland/X11 use to associate the running window with its .desktop
+  // entry (and therefore its icon). Without it, desktop environments show a generic
+  // icon since they can't resolve the app_id/WM_CLASS Electron picks by default.
+  app.setDesktopName('dj_manager.desktop');
   app.disableHardwareAcceleration();
   if (process.env.WAYLAND_DISPLAY) {
     app.commandLine.appendSwitch('ozone-platform', 'wayland');

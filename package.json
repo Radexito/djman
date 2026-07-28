@@ -3,6 +3,7 @@
   "version": "1.0.23",
   "description": "DJ-focused music library manager",
   "main": "src/main.js",
+  "desktopName": "dj_manager.desktop",
   "scripts": {
     "react": "cd renderer && npm run dev",
     "electron": "wait-on file:.dev-url && electron .",
@@ -53,7 +54,8 @@
       ],
       "category": "Audio",
       "extraResources": [],
-      "artifactName": "${productName}-${version}-Linux.${ext}"
+      "artifactName": "${productName}-${version}-Linux.${ext}",
+      "syncDesktopName": true
     },
     "mac": {
       "target": [
