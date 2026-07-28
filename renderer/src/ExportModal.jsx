@@ -8,6 +8,7 @@ const STEPS = {
   pickFolder: 'pickFolder',
   checkingFormat: 'checkingFormat',
   needsFormat: 'needsFormat',
+  notRemovable: 'notRemovable',
   formatting: 'formatting',
   exporting: 'exporting',
   done: 'done',
@@ -98,7 +99,11 @@ function ExportModal({ onClose, playlistId, initialMode }) {
     setStep(STEPS.checkingFormat);
     const info = await window.api.checkUsbFormat(dir);
     setUsbInfo(info);
-    if (info.needsFormat) {
+    if (info.needsFormat && !info.removable) {
+      // Never offer to format a drive we couldn't positively confirm is removable —
+      // block here so the user isn't shown a "Format" button for an internal disk.
+      setStep(STEPS.notRemovable);
+    } else if (info.needsFormat) {
       setStep(STEPS.needsFormat);
     } else {
       startExport(exportMode, dir);
@@ -277,6 +282,36 @@ function ExportModal({ onClose, playlistId, initialMode }) {
                 onClick={() => setStep('confirmFormat')}
               >
                 Format to FAT32 &amp; Export
+              </button>
+              <button className="export-cancel-btn" onClick={() => setStep(STEPS.idle)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === STEPS.notRemovable && usbInfo && (
+          <div className="export-modal-body">
+            <p className="export-needs-format-title">⚠️ Cannot format this drive</p>
+            <p className="export-needs-format-desc">
+              This drive is formatted as <strong>{usbInfo.fsLabel}</strong>, but it could not be
+              confirmed as removable media. To prevent accidentally erasing an internal disk,
+              formatting is only allowed on drives positively identified as removable/external.
+            </p>
+            <p className="export-needs-format-sub">
+              <span className="export-info-label">Device:</span> {usbInfo.device ?? 'unknown'} ·{' '}
+              <span className="export-info-label">Mount:</span> {usbRoot}
+            </p>
+            <p className="export-needs-format-hint">
+              You can still export to this folder as-is, or choose a different, removable drive to
+              format.
+            </p>
+            <div className="export-needs-format-actions">
+              <button
+                className="export-option-btn export-option-btn--secondary"
+                onClick={() => startExport(mode, usbRoot)}
+              >
+                Export Anyway
               </button>
               <button className="export-cancel-btn" onClick={() => setStep(STEPS.idle)}>
                 Cancel
