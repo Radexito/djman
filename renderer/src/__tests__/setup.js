@@ -6,6 +6,7 @@ const noop = () => () => {}; // returns unsubscribe fn
 window.api = {
   getTracks: vi.fn().mockResolvedValue([]),
   getTrackIds: vi.fn().mockResolvedValue([]),
+  getUnavailableLinkedTracks: vi.fn().mockResolvedValue([]),
   getCuePoints: vi.fn().mockResolvedValue([]),
   addCuePoint: vi.fn().mockResolvedValue({ id: 1 }),
   updateCuePoint: vi.fn().mockResolvedValue({ ok: true }),
@@ -83,6 +84,7 @@ window.api = {
   tidalFetchInfo: vi.fn().mockResolvedValue({ ok: false, error: 'not configured' }),
   tidalLogin: vi.fn().mockResolvedValue({ ok: true }),
   tidalDownloadUrl: vi.fn().mockResolvedValue({ ok: true, trackIds: [], playlistId: null }),
+  cloudSearch: vi.fn().mockResolvedValue({ ok: true, results: [] }),
   onTidalProgress: vi.fn().mockImplementation(() => () => {}),
   onTidalLoginUrl: vi.fn().mockImplementation(() => () => {}),
   onTidalInstallProgress: vi.fn().mockImplementation(() => () => {}),

@@ -25,6 +25,8 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     outputDeviceId,
     volume,
     history,
+    playbackError,
+    clearPlaybackError,
     togglePlay,
     next,
     prev,
@@ -66,6 +68,13 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     }
     loadDevices();
   }, []);
+
+  // Auto-dismiss the playback-error toast
+  useEffect(() => {
+    if (!playbackError) return;
+    const timer = setTimeout(() => clearPlaybackError(), 4500);
+    return () => clearTimeout(timer);
+  }, [playbackError, clearPlaybackError]);
 
   // Load cue points whenever the playing track changes
   useEffect(() => {
@@ -333,6 +342,15 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
 
   return (
     <div className="player-bar">
+      {playbackError && (
+        <div
+          className="player-bar-toast player-bar-toast--warn"
+          onClick={clearPlaybackError}
+          title="Dismiss"
+        >
+          ⚠ {playbackError}
+        </div>
+      )}
       {/* Left: album art + current track info */}
       <div className="player-left">
         {artSrc ? (

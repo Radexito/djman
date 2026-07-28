@@ -290,6 +290,24 @@
   opacity: 0.45;
 }
 
+/* Linked track whose backing file can't currently be found (e.g. USB unplugged) */
+.row--unavailable {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.hide-unavailable-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #f4a261;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
 /* New row: space slides open (scaleY), then content fades in */
 @keyframes rowSlideIn {
   0% {

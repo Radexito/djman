@@ -89,12 +89,14 @@ import {
 import {
   downloadUrl as ytDlpDownloadUrl,
   fetchPlaylistInfo as ytDlpFetchPlaylistInfo,
+  searchYouTube,
 } from './audio/ytDlpManager.js';
 import {
   checkTidalSetup,
   startLogin as tidalStartLogin,
   downloadTidal,
   fetchTidalInfo,
+  searchTidal,
 } from './audio/tidalDlManager.js';
 import { generateWaveformOverview } from './audio/waveformGenerator.js';
 import { ensureDeps, getFfmpegRuntimePath } from './deps.js';
@@ -390,6 +392,14 @@ ipcMain.handle('retry-deps', () => {
 });
 ipcMain.handle('get-tracks', (_, params) => getTracks(params));
 ipcMain.handle('get-track-ids', (_, params) => getTrackIds(params));
+// Linked (Explorer-referenced) tracks point at arbitrary, often removable paths
+// (USB drives, etc.) — check which ones are currently unreachable so the UI can
+// gray them out instead of failing playback with no explanation.
+ipcMain.handle('get-unavailable-linked-tracks', () =>
+  getLinkedTracksBasic()
+    .filter((t) => !fs.existsSync(t.file_path))
+    .map((t) => t.id)
+);
 ipcMain.handle('get-track-waveform', (_, trackId) => {
   const buf = getTrackWaveform(trackId);
   return buf ? new Uint8Array(buf) : null;
@@ -1234,6 +1244,38 @@ ipcMain.handle('tidal-fetch-info', async (_event, url) => {
     return info;
   } catch (err) {
     console.error('[tidal-fetch-info] error:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('cloud-search', async (_event, { source, query, types, limit }) => {
+  if (!query?.trim()) return { ok: false, error: 'Empty query' };
+  try {
+    if (source === 'youtube') {
+      const results = await searchYouTube(query, { limit });
+      return { ok: true, results };
+    }
+    if (source === 'tidal') {
+      const res = await searchTidal(query, { types, limit });
+      if (!res.ok) return res;
+      return {
+        ok: true,
+        results: res.results.map((r) => ({
+          source: 'tidal',
+          type: r.type,
+          id: r.id,
+          title: r.title,
+          artist: r.artist,
+          album: r.album,
+          durationSec: r.duration,
+          quality: r.quality,
+          url: r.url,
+        })),
+      };
+    }
+    return { ok: false, error: `Unknown source: ${source}` };
+  } catch (err) {
+    console.error('[cloud-search] error:', err.message);
     return { ok: false, error: err.message };
   }
 });

@@ -34,6 +34,8 @@ import './MusicLibrary.css';
 const PAGE_SIZE = 50;
 const ROW_HEIGHT = 50;
 const PRELOAD_TRIGGER = 3;
+// Stable fallback so tests/mocks that stub usePlayer() without this field don't crash.
+const EMPTY_SET = new Set();
 
 const LS_COL_KEY = 'djman_column_visibility';
 const LS_ORDER_KEY = 'djman_column_order';
@@ -225,6 +227,7 @@ function LibraryRow({
   mediaPort,
   newTrackIds,
   onAnimationEnd,
+  unavailableLinkedIds,
 }) {
   const t = tracks[index];
   if (!t) {
@@ -240,14 +243,17 @@ function LibraryRow({
   const isSelected = selectedIds.has(t.id);
   const isPlaying = currentTrackId === t.id;
   const isNew = newTrackIds?.has(t.id);
+  const isUnavailable = t.is_linked && unavailableLinkedIds?.has(t.id);
   return (
     <div
       style={{ ...style, gridTemplateColumns: gridTemplate, minWidth: minScrollWidth }}
-      className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}${isSelected ? ' row--selected' : ''}${isPlaying ? ' row--playing' : ''}${t.analyzed === 0 ? ' row--analyzing' : ''}${isNew ? ' row--new' : ''}`}
+      className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}${isSelected ? ' row--selected' : ''}${isPlaying ? ' row--playing' : ''}${t.analyzed === 0 ? ' row--analyzing' : ''}${isNew ? ' row--new' : ''}${isUnavailable ? ' row--unavailable' : ''}`}
       title={
-        t.analyzed === 0
-          ? `⏳ Analyzing / processing — "${t.title}" will be available shortly`
-          : `${t.title} - ${t.artist || 'Unknown'}`
+        isUnavailable
+          ? `⚠ File not found — "${t.title}" may be on a disconnected drive`
+          : t.analyzed === 0
+            ? `⏳ Analyzing / processing — "${t.title}" will be available shortly`
+            : `${t.title} - ${t.artist || 'Unknown'}`
       }
       draggable={true}
       onDragStart={(e) => onDragStart(e, t)}
@@ -309,7 +315,14 @@ function LibraryRow({
               <span className="cell-artwork cell-artwork--placeholder">♪</span>
             )}
             {t.is_linked ? (
-              <span className="cell-linked-badge" title="Explorer-linked file">
+              <span
+                className="cell-linked-badge"
+                title={
+                  isUnavailable
+                    ? 'File not found — may be on a disconnected drive'
+                    : 'Explorer-linked file'
+                }
+              >
                 🔗
               </span>
             ) : null}
@@ -342,6 +355,7 @@ function SortableRow({
   mediaPort,
   isNew,
   onAnimationEnd,
+  isUnavailable,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: t.id,
@@ -357,11 +371,13 @@ function SortableRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}${isSelected ? ' row--selected' : ''}${isPlaying ? ' row--playing' : ''}${t.analyzed === 0 ? ' row--analyzing' : ''}${isNew ? ' row--new' : ''}`}
+      className={`row ${index % 2 === 0 ? 'row-even' : 'row-odd'}${isSelected ? ' row--selected' : ''}${isPlaying ? ' row--playing' : ''}${t.analyzed === 0 ? ' row--analyzing' : ''}${isNew ? ' row--new' : ''}${isUnavailable ? ' row--unavailable' : ''}`}
       title={
-        t.analyzed === 0
-          ? `⏳ Analyzing / processing — "${t.title}" will be available shortly`
-          : `${t.title} - ${t.artist || 'Unknown'}`
+        isUnavailable
+          ? `⚠ File not found — "${t.title}" may be on a disconnected drive`
+          : t.analyzed === 0
+            ? `⏳ Analyzing / processing — "${t.title}" will be available shortly`
+            : `${t.title} - ${t.artist || 'Unknown'}`
       }
       onClick={(e) => onRowClick(e, t, index)}
       onDoubleClick={() => onDoubleClick(t, index)}
@@ -421,7 +437,14 @@ function SortableRow({
               <span className="cell-artwork cell-artwork--placeholder">♪</span>
             )}
             {t.is_linked ? (
-              <span className="cell-linked-badge" title="Explorer-linked file">
+              <span
+                className="cell-linked-badge"
+                title={
+                  isUnavailable
+                    ? 'File not found — may be on a disconnected drive'
+                    : 'Explorer-linked file'
+                }
+              >
                 🔗
               </span>
             ) : null}
@@ -469,7 +492,15 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     patchCurrentTrack,
     reloadCurrentTrack,
     updateQueue,
+    unavailableLinkedIds = EMPTY_SET,
   } = usePlayer();
+
+  const [hideUnavailable, setHideUnavailable] = useState(
+    () => localStorage.getItem('djman_hide_unavailable') === 'true'
+  );
+  useEffect(() => {
+    localStorage.setItem('djman_hide_unavailable', String(hideUnavailable));
+  }, [hideUnavailable]);
 
   // Only highlight a track as "playing" when the source context matches this view.
   // Library view: only highlight when played from library (currentPlaylistId === null).
@@ -615,7 +646,10 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
   }, [search, selectedPlaylist]); // no hasMore in deps — we use hasMoreRef
 
   const sortedTracks = useMemo(() => {
-    const sorted = [...tracks].sort((a, b) => {
+    const base = hideUnavailable
+      ? tracks.filter((t) => !(t.is_linked && unavailableLinkedIds.has(t.id)))
+      : tracks;
+    const sorted = [...base].sort((a, b) => {
       if (sortBy.key === 'index') return 0;
       // For BPM, prefer the override value
       const va = sortBy.key === 'bpm' ? (a.bpm_override ?? a.bpm ?? '') : (a[sortBy.key] ?? '');
@@ -630,7 +664,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     });
     sortedTracksRef.current = sorted;
     return sorted;
-  }, [tracks, sortBy]);
+  }, [tracks, sortBy, hideUnavailable, unavailableLinkedIds]);
 
   useEffect(() => {
     // Snapshot IDs currently visible so loadTracks can diff truly-new rows
@@ -1305,6 +1339,16 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
       className={`music-library${detailsTrack || detailsBulkTracks ? ' music-library--with-panel' : ''}`}
     >
       <div className="music-library__main">
+        {unavailableLinkedIds.size > 0 && (
+          <label className="hide-unavailable-toggle">
+            <input
+              type="checkbox"
+              checked={hideUnavailable}
+              onChange={(e) => setHideUnavailable(e.target.checked)}
+            />
+            Hide unavailable tracks ({unavailableLinkedIds.size})
+          </label>
+        )}
         {/* Playlist header bar */}
         {isPlaylistView && playlistInfo && (
           <div className="playlist-header-bar">
@@ -1432,6 +1476,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                         mediaPort={mediaPort}
                         isNew={newTrackIds.has(t.id)}
                         onAnimationEnd={handleRowAnimationEnd}
+                        isUnavailable={t.is_linked && unavailableLinkedIds.has(t.id)}
                       />
                     ))}
                   </div>
@@ -1479,6 +1524,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                 mediaPort,
                 newTrackIds,
                 onAnimationEnd: handleRowAnimationEnd,
+                unavailableLinkedIds,
               }}
             />
           )}

@@ -37,6 +37,7 @@ export default defineConfig({
           include: [
             'src/__tests__/importManager.test.js',
             'src/__tests__/ytDlpManager.test.js',
+            'src/__tests__/tidalDlManager.test.js',
             'src/__tests__/mediaServer.test.js',
             'src/__tests__/anlzWriter.test.js',
             'src/__tests__/waveformGenerator.test.js',
