@@ -29,6 +29,7 @@ import { parseQuery } from './searchParser.js';
 import TrackDetails from './TrackDetails.jsx';
 import RatingStars from './RatingStars.jsx';
 import BeatGridEditor from './BeatGridEditor.jsx';
+import SearchBar from './SearchBar.jsx';
 import './MusicLibrary.css';
 
 const PAGE_SIZE = 50;
@@ -1431,6 +1432,9 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
       className={`music-library${detailsTrack || detailsBulkTracks ? ' music-library--with-panel' : ''}`}
     >
       <div className="music-library__main">
+        <div className="music-library__search">
+          <SearchBar value={search} onChange={onSearchChange} />
+        </div>
         {unavailableLinkedIds.size > 0 && (
           <label className="hide-unavailable-toggle">
             <input

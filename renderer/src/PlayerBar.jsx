@@ -20,19 +20,12 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     isPlaying,
     currentTime,
     duration,
-    shuffle,
-    repeat,
     outputDeviceId,
     volume,
     history,
     playbackError,
     clearPlaybackError,
-    togglePlay,
-    next,
-    prev,
     seek,
-    toggleShuffle,
-    cycleRepeat,
     setDevice,
     setVolume,
     play,
@@ -387,81 +380,53 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
         </div>
       </div>
 
-      {/* Center: transport controls + seekbar */}
-      <div className="player-center">
-        <div className="player-controls">
-          <button
-            className={`player-btn player-btn--toggle${shuffle ? ' player-btn--active' : ''}`}
-            onClick={toggleShuffle}
-            title="Shuffle"
-          >
-            ⇄
-          </button>
-          <button className="player-btn" onClick={prev} title="Previous">
-            ⏮
-          </button>
-          <button className="player-btn player-btn--play" onClick={togglePlay} title="Play / Pause">
-            {isPlaying ? '⏸' : '▶'}
-          </button>
-          <button className="player-btn" onClick={next} title="Next">
-            ⏭
-          </button>
-          <button
-            className={`player-btn player-btn--toggle${repeat !== 'none' ? ' player-btn--active' : ''}`}
-            onClick={cycleRepeat}
-            title={`Repeat: ${repeat}`}
-          >
-            {repeat === 'one' ? '↺¹' : '↺'}
-          </button>
+      {/* Center: full-width seekbar / waveform */}
+      <div className="player-seek">
+        <span className="player-time">{formatTime(currentTime)}</span>
+        <div className="player-seekbar-wrap">
+          <div ref={seekbarBgRef} className="player-seekbar-bg" />
+          <canvas ref={waveCanvasRef} className="player-waveform-canvas" />
+          <input
+            ref={seekbarRef}
+            type="range"
+            className="player-seekbar"
+            min={0}
+            max={duration || 0}
+            step={0.5}
+            defaultValue={0}
+            onPointerDown={(e) => {
+              console.log(`[seekbar] pointerDown value=${Number(e.target.value).toFixed(3)}`);
+              seekingRef.current = true;
+            }}
+            onPointerUp={(e) => {
+              const val = Number(e.target.value);
+              console.log(`[seekbar] pointerUp  value=${val.toFixed(3)}`);
+              seek(val);
+              seekingRef.current = false;
+            }}
+          />
+          {duration > 0 &&
+            cuePoints
+              .filter((cue) => (cue.hot_cue_index >= 0 ? showHotCues : showMemCues))
+              .map((cue) => {
+                const pct = Math.min((cue.position_ms / 1000 / duration) * 100, 100);
+                return (
+                  <button
+                    key={cue.id}
+                    className="player-cue-marker"
+                    style={{ left: `${pct}%`, background: cue.color }}
+                    title={
+                      cue.label ||
+                      (cue.hot_cue_index >= 0
+                        ? `Hot cue ${'ABCDEFGHIJKLMNOP'[cue.hot_cue_index]}`
+                        : 'Memory cue')
+                    }
+                    onClick={() => seek(cue.position_ms / 1000)}
+                  />
+                );
+              })}
         </div>
-
-        <div className="player-seek">
-          <span className="player-time">{formatTime(currentTime)}</span>
-          <div className="player-seekbar-wrap">
-            <div ref={seekbarBgRef} className="player-seekbar-bg" />
-            <canvas ref={waveCanvasRef} className="player-waveform-canvas" />
-            <input
-              ref={seekbarRef}
-              type="range"
-              className="player-seekbar"
-              min={0}
-              max={duration || 0}
-              step={0.5}
-              defaultValue={0}
-              onPointerDown={(e) => {
-                console.log(`[seekbar] pointerDown value=${Number(e.target.value).toFixed(3)}`);
-                seekingRef.current = true;
-              }}
-              onPointerUp={(e) => {
-                const val = Number(e.target.value);
-                console.log(`[seekbar] pointerUp  value=${val.toFixed(3)}`);
-                seek(val);
-                seekingRef.current = false;
-              }}
-            />
-            {duration > 0 &&
-              cuePoints
-                .filter((cue) => (cue.hot_cue_index >= 0 ? showHotCues : showMemCues))
-                .map((cue) => {
-                  const pct = Math.min((cue.position_ms / 1000 / duration) * 100, 100);
-                  return (
-                    <button
-                      key={cue.id}
-                      className="player-cue-marker"
-                      style={{ left: `${pct}%`, background: cue.color }}
-                      title={
-                        cue.label ||
-                        (cue.hot_cue_index >= 0
-                          ? `Hot cue ${'ABCDEFGHIJKLMNOP'[cue.hot_cue_index]}`
-                          : 'Memory cue')
-                      }
-                      onClick={() => seek(cue.position_ms / 1000)}
-                    />
-                  );
-                })}
-          </div>
-          <span className="player-time">{formatTime(duration)}</span>
-        </div>
+        <span className="player-time">{formatTime(duration)}</span>
       </div>
 
       {/* Right: volume + device picker + history + navigate to playlist */}
