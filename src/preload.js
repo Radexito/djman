@@ -265,6 +265,13 @@ contextBridge.exposeInMainWorld('api', {
   remapFolder: (oldDir) => ipcRenderer.invoke('remap-folder', { oldDir }),
   moveTrackToLibrary: (trackId, targetLibraryId) =>
     ipcRenderer.invoke('move-track-to-library', { trackId, targetLibraryId }),
+  moveTracksToLibrary: (trackIds, targetLibraryId) =>
+    ipcRenderer.invoke('move-tracks-to-library', { trackIds, targetLibraryId }),
+  onMoveLibraryProgress: (cb) => {
+    const handler = (_, data) => cb(data);
+    ipcRenderer.on('move-library-progress', handler);
+    return () => ipcRenderer.removeListener('move-library-progress', handler);
+  },
   checkLinkedTrackStatus: (trackIds) => ipcRenderer.invoke('check-linked-track-status', trackIds),
   getLinkedTracksBasic: () => ipcRenderer.invoke('get-linked-tracks-basic'),
 

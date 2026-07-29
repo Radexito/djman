@@ -1193,40 +1193,37 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     async (targetLibraryId, targetIds) => {
       setContextMenu(null);
       if (!targetIds?.length) return;
-      const movedIds = [];
-      let failed = 0;
-      for (const id of targetIds) {
-        try {
-          await window.api.moveTrackToLibrary(id, targetLibraryId);
-          movedIds.push(id);
-        } catch (err) {
-          console.error('moveTrackToLibrary failed:', err);
-          failed++;
-        }
-      }
-      if (movedIds.length > 0) {
+      const { moved, failed } = await window.api.moveTracksToLibrary(targetIds, targetLibraryId);
+      const patchById = new Map(
+        moved.map(({ trackId, newPath }) => [
+          trackId,
+          { library_id: targetLibraryId, is_linked: 0, ...(newPath ? { file_path: newPath } : {}) },
+        ])
+      );
+      if (patchById.size > 0) {
         setTracks((prev) =>
-          prev.map((t) => (movedIds.includes(t.id) ? { ...t, library_id: targetLibraryId } : t))
+          prev.map((t) => (patchById.has(t.id) ? { ...t, ...patchById.get(t.id) } : t))
         );
         // Keep an already-open Edit Details panel in sync (same fix as the
         // library-move/storage-format case above) — otherwise it keeps
         // showing the track's old library after a move.
         setDetailsTrack((prev) =>
-          prev && movedIds.includes(prev.id) ? { ...prev, library_id: targetLibraryId } : prev
+          prev && patchById.has(prev.id) ? { ...prev, ...patchById.get(prev.id) } : prev
         );
         setDetailsBulkTracks((prev) =>
           prev
-            ? prev.map((t) => (movedIds.includes(t.id) ? { ...t, library_id: targetLibraryId } : t))
+            ? prev.map((t) => (patchById.has(t.id) ? { ...t, ...patchById.get(t.id) } : t))
             : prev
         );
       }
-      const moved = movedIds.length;
-      if (failed === 0) {
-        showToast(`Moved ${moved} track${moved !== 1 ? 's' : ''} to library.`);
-      } else if (moved === 0) {
+      const movedCount = moved.length;
+      const failedCount = failed.length;
+      if (failedCount === 0) {
+        showToast(`Moved ${movedCount} track${movedCount !== 1 ? 's' : ''} to library.`);
+      } else if (movedCount === 0) {
         showToast(`Failed to move track${targetIds.length !== 1 ? 's' : ''}.`, false);
       } else {
-        showToast(`Moved ${moved}, failed to move ${failed}.`, false);
+        showToast(`Moved ${movedCount}, failed to move ${failedCount}.`, false);
       }
     },
     [showToast]

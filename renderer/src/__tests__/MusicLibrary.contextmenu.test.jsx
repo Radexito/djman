@@ -258,7 +258,7 @@ describe('context menu — move to library', () => {
     expect(screen.getByText('2.0 MB free')).toBeInTheDocument();
   });
 
-  it('clicking a library calls moveTrackToLibrary with the track id and target library', async () => {
+  it('clicking a library calls moveTracksToLibrary with the track id and target library', async () => {
     window.api.listLibrariesWithFreeSpace.mockResolvedValue([
       { id: 1, name: 'Default', free_bytes: 5 * 1024 ** 3 },
       { id: 2, name: 'Backup', free_bytes: 2 * 1024 ** 3 },
@@ -269,11 +269,14 @@ describe('context menu — move to library', () => {
     fireEvent.mouseEnter(getSubmenuParent('📚 Move to library'));
 
     fireEvent.click(await screen.findByText('Backup'));
-    await waitFor(() => expect(window.api.moveTrackToLibrary).toHaveBeenCalledWith(1, 2));
+    await waitFor(() => expect(window.api.moveTracksToLibrary).toHaveBeenCalledWith([1], 2));
   });
 
   it('updates an already-open Edit Details panel in place after moving that same track', async () => {
-    window.api.moveTrackToLibrary.mockResolvedValue({ ok: true });
+    window.api.moveTracksToLibrary.mockResolvedValue({
+      moved: [{ trackId: 1, newPath: '/tmp/userData/audio/2/newpath.mp3' }],
+      failed: [],
+    });
     window.api.listLibraries.mockResolvedValue([
       { id: 1, name: 'Default', storage_format: 'hashed', root_path: null },
       { id: 2, name: 'Backup', storage_format: 'hashed', root_path: null },
@@ -299,7 +302,7 @@ describe('context menu — move to library', () => {
       el.textContent.includes('Backup')
     );
     fireEvent.click(backupItem);
-    await waitFor(() => expect(window.api.moveTrackToLibrary).toHaveBeenCalledWith(1, 2));
+    await waitFor(() => expect(window.api.moveTracksToLibrary).toHaveBeenCalledWith([1], 2));
 
     // The still-open panel should reflect the new library without being reopened.
     await waitFor(() =>

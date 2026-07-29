@@ -1928,6 +1928,28 @@ ipcMain.handle('move-track-to-library', async (_, { trackId, targetLibraryId }) 
   return result;
 });
 
+ipcMain.handle('move-tracks-to-library', async (_, { trackIds, targetLibraryId }) => {
+  const total = trackIds.length;
+  const moved = [];
+  const failed = [];
+
+  for (let i = 0; i < total; i++) {
+    const trackId = trackIds[i];
+    try {
+      const result = await moveTrackToLibrary(trackId, targetLibraryId);
+      moved.push({ trackId, newPath: result.newPath ?? null });
+    } catch (err) {
+      console.error('moveTrackToLibrary failed:', trackId, err);
+      failed.push(trackId);
+    }
+    send('move-library-progress', { completed: i + 1, total });
+  }
+
+  if (moved.length > 0) send('library-updated');
+  send('move-library-progress', { completed: total, total, done: true });
+  return { moved, failed };
+});
+
 ipcMain.handle('check-linked-track-status', (_, trackIds) => {
   return trackIds.map((id) => {
     const t = getTrackById(id);

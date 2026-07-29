@@ -36,6 +36,7 @@ function Sidebar({
   const [normalizeProgress, setNormalizeProgress] = useState(null); // { completed, total } | null
   const [analysisProgress, setAnalysisProgress] = useState(null); // { done, total } | null
   const [waveformGenProgress, setWaveformGenProgress] = useState(null); // { completed, total } | null
+  const [moveLibraryProgress, setMoveLibraryProgress] = useState(null); // { completed, total } | null
   const [exportProgress, setExportProgress] = useState(null); // { copied, total, pct } | null
   const [ytDlpCheckProgress, setYtDlpCheckProgress] = useState(null); // { checked, total } | null during fetch/check
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -193,6 +194,18 @@ function Sidebar({
         setTimeout(() => setWaveformGenProgress(null), 1500);
       } else {
         setWaveformGenProgress({ completed: data.completed, total: data.total });
+      }
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!window.api.onMoveLibraryProgress) return;
+    const unsub = window.api.onMoveLibraryProgress((data) => {
+      if (data.done) {
+        setTimeout(() => setMoveLibraryProgress(null), 1500);
+      } else {
+        setMoveLibraryProgress({ completed: data.completed, total: data.total });
       }
     });
     return unsub;
@@ -425,6 +438,24 @@ function Sidebar({
                 className="normalize-progress-fill"
                 style={{
                   width: `${waveformGenProgress.total > 0 ? Math.round((waveformGenProgress.completed / waveformGenProgress.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {moveLibraryProgress && (
+          <div className="normalize-progress-wrap">
+            <div className="normalize-progress-label">
+              <span>Moving tracks</span>
+              <span>
+                {moveLibraryProgress.completed} / {moveLibraryProgress.total}
+              </span>
+            </div>
+            <div className="normalize-progress-bar">
+              <div
+                className="normalize-progress-fill"
+                style={{
+                  width: `${moveLibraryProgress.total > 0 ? Math.round((moveLibraryProgress.completed / moveLibraryProgress.total) * 100) : 0}%`,
                 }}
               />
             </div>

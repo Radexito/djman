@@ -310,6 +310,15 @@ describe('trackRepository', () => {
       expect(track.key_raw).toBe('Am');
       expect(track.title).toBe('Test Track'); // unchanged
     });
+
+    it('persists library_id and is_linked (used by moveTrackToLibrary)', () => {
+      const id = addTrack(SAMPLE);
+      updateTrack(id, { library_id: 2, is_linked: 0, file_path: '/tmp/new/location.mp3' });
+      const track = getTrackById(id);
+      expect(track.library_id).toBe(2);
+      expect(track.is_linked).toBe(0);
+      expect(track.file_path).toBe('/tmp/new/location.mp3');
+    });
   });
 
   describe('removeTrack', () => {
