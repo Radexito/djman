@@ -859,8 +859,12 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
   // Keyboard shortcuts
   useEffect(() => {
     const onKeyDown = async (e) => {
-      // Ctrl+A — select all tracks including unloaded ones
+      // Ctrl+A — select all tracks including unloaded ones (but let native
+      // select-all-text win when the user is typing in an input/textarea,
+      // e.g. the search box)
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        const target = e.target;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         e.preventDefault();
         const { filters, remaining } = parseQuery(search);
         const structuredFilters = filters.filter((f) => f.field !== '_text');
