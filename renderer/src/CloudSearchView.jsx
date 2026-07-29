@@ -191,6 +191,11 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
 
   const selectedResults = results.filter((r) => selected.has(resultKey(r)));
 
+  const previewResult = (e, r) => {
+    e.stopPropagation();
+    if (r.url) window.api.openExternal(r.url);
+  };
+
   const handleDownload = async () => {
     if (selectedResults.length === 0 || downloading) return;
     setDownloading(true);
@@ -363,7 +368,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
       {results.length > 0 &&
         (() => {
           const columns = getColumns(results[0]?.source, results[0]?.type);
-          const gridTemplateColumns = `28px ${columns.map((c) => c.width).join(' ')} 20px`;
+          const gridTemplateColumns = `28px ${columns.map((c) => c.width).join(' ')} 28px 20px`;
           return (
             <div className="cloud-search-results">
               <div className="cloud-search-results-header">
@@ -395,6 +400,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
                     <span key={c.key}>{c.label}</span>
                   ))}
                   <span />
+                  <span />
                 </div>
                 {results.map((r) => {
                   const k = resultKey(r);
@@ -422,6 +428,19 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
                           {c.render(r)}
                         </span>
                       ))}
+                      <span onClick={(e) => e.stopPropagation()}>
+                        {r.url && (
+                          <button
+                            type="button"
+                            className="cloud-search-preview-btn"
+                            title={`Open "${r.title}" in your browser`}
+                            aria-label={`Preview ${r.title} externally`}
+                            onClick={(e) => previewResult(e, r)}
+                          >
+                            ↗
+                          </button>
+                        )}
+                      </span>
                       <span
                         className={
                           status ? `cloud-search-status cloud-search-status--${status}` : ''

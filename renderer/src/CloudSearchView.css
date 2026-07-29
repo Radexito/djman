@@ -206,6 +206,27 @@
   white-space: nowrap;
 }
 
+.cloud-search-preview-btn {
+  background: none;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: var(--text-secondary, #aaa);
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cloud-search-preview-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--accent, #7c5cfc);
+}
+
 .cloud-search-status--done {
   color: #6bd68b;
 }
