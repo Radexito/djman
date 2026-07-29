@@ -1783,7 +1783,9 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                     {librarySubmenu !== null && librarySubmenu.length > 1 && (
                       <SubItem id="move-to-library" label="📚 Move to library" wide>
                         {librarySubmenu.map((lib) => {
-                          const isCurrent = contextMenu.track?.library_id === lib.id;
+                          const isCurrent =
+                            !contextMenu.track?.is_linked &&
+                            contextMenu.track?.library_id === lib.id;
                           return (
                             <div
                               key={lib.id}
