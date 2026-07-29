@@ -1161,7 +1161,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     if (!window.confirm(msg)) return;
     if (currentTrack && targetIds.includes(currentTrack.id)) stop();
     setContextMenu(null);
-    for (const id of targetIds) await window.api.removeTrack(id);
+    await window.api.removeTracks(targetIds);
     setTracks((prev) => prev.filter((t) => !targetIds.includes(t.id)));
     setSelectedIds(new Set());
     offsetRef.current = Math.max(0, offsetRef.current - targetIds.length);

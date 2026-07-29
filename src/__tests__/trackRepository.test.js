@@ -6,6 +6,7 @@ import {
   getTrackByHash,
   updateTrack,
   removeTrack,
+  removeTracks,
   getTrackCountByFilePath,
   getTrackIds,
   normalizeLibrary,
@@ -340,6 +341,22 @@ describe('trackRepository', () => {
       const id2 = addTrack({ ...SAMPLE, file_hash: 'other', file_path: '/tmp/other.mp3' });
       removeTrack(id1);
       expect(getTrackById(id2)).toBeDefined();
+    });
+  });
+
+  describe('removeTracks', () => {
+    it('deletes all given tracks in one transaction', () => {
+      const id1 = addTrack(SAMPLE);
+      const id2 = addTrack({ ...SAMPLE, file_hash: 'b', file_path: '/tmp/b.mp3' });
+      const id3 = addTrack({ ...SAMPLE, file_hash: 'c', file_path: '/tmp/c.mp3' });
+      removeTracks([id1, id2]);
+      expect(getTrackById(id1)).toBeUndefined();
+      expect(getTrackById(id2)).toBeUndefined();
+      expect(getTrackById(id3)).toBeDefined();
+    });
+
+    it('handles an empty array without error', () => {
+      expect(() => removeTracks([])).not.toThrow();
     });
   });
 
