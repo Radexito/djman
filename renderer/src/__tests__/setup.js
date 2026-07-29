@@ -6,7 +6,16 @@ const noop = () => () => {}; // returns unsubscribe fn
 window.api = {
   getTracks: vi.fn().mockResolvedValue([]),
   getTrackIds: vi.fn().mockResolvedValue([]),
-  listLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Default', storage_format: 'hashed' }]),
+  listLibraries: vi.fn().mockResolvedValue([
+    {
+      id: 1,
+      name: 'Default',
+      storage_format: 'hashed',
+      root_path: null,
+      effective_root_path: '/tmp/userData/audio',
+    },
+  ]),
+  getLibrarySize: vi.fn().mockResolvedValue(0),
   getCurrentLibraryId: vi.fn().mockResolvedValue(1),
   setCurrentLibraryId: vi.fn().mockResolvedValue(undefined),
   createLibrary: vi
@@ -17,6 +26,7 @@ window.api = {
   convertStorageFormat: vi.fn().mockResolvedValue({ moved: 0, total: 0 }),
   onConvertStorageFormatProgress: vi.fn().mockImplementation(noop),
   getDbPath: vi.fn().mockResolvedValue('/tmp/library.db'),
+  getDbSize: vi.fn().mockResolvedValue(0),
   moveDatabase: vi.fn().mockResolvedValue(undefined),
   getUnavailableLinkedTracks: vi.fn().mockResolvedValue([]),
   getCuePoints: vi.fn().mockResolvedValue([]),

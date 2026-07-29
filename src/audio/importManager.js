@@ -101,6 +101,34 @@ export function getArtworkBase(libraryId) {
   return defaultArtworkBase(libraryId);
 }
 
+function getDirSize(dir) {
+  let total = 0;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0; // not created yet (e.g. brand-new library with no imports)
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      total += getDirSize(full);
+    } else if (entry.isFile()) {
+      try {
+        total += fs.statSync(full).size;
+      } catch {
+        /* file removed mid-scan */
+      }
+    }
+  }
+  return total;
+}
+
+/** Total bytes a library's audio + artwork files occupy on disk. */
+export function getLibraryDiskUsage(libraryId) {
+  return getDirSize(getLibraryBase(libraryId)) + getDirSize(getArtworkBase(libraryId));
+}
+
 export function getStorageFormat(libraryId) {
   return getLibrary(libraryId)?.storage_format === 'readable' ? 'readable' : 'hashed';
 }
