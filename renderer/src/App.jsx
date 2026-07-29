@@ -16,6 +16,10 @@ import { TidalDownloadProvider } from './TidalDownloadContext.jsx';
 import { DepsOverlay } from './DepsOverlay.jsx';
 import './App.css';
 
+// Tabs that don't use the shared MusicLibrary search bar — clicking one of
+// these again shouldn't try to clear a search that isn't showing there.
+const NON_SEARCHABLE_TABS = new Set(['download', 'tidal', 'cloud-search', 'explorer']);
+
 function App() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('music');
   const [showSettings, setShowSettings] = useState(false);
@@ -30,6 +34,16 @@ function App() {
   const handleArtistSearch = (artist) => {
     setSelectedPlaylistId('music');
     setSearch(`ARTIST is ${artist}`);
+  };
+
+  const handleLogoClick = () => {
+    setSelectedPlaylistId('music');
+    setSearch('');
+  };
+
+  const handleMenuSelect = (id) => {
+    if (id === selectedPlaylistId && !NON_SEARCHABLE_TABS.has(id)) setSearch('');
+    setSelectedPlaylistId(id);
   };
 
   useEffect(() => {
@@ -113,11 +127,12 @@ function App() {
               search={search}
               onSearchChange={setSearch}
               onOpenSettings={() => setShowSettings(true)}
+              onLogoClick={handleLogoClick}
             />
             <div className="app-main">
               <Sidebar
                 selectedMenuItemId={selectedPlaylistId}
-                onMenuSelect={setSelectedPlaylistId}
+                onMenuSelect={handleMenuSelect}
                 activePlaylistId={selectedPlaylistId}
                 onExportPlaylistRekordboxUsb={(id) =>
                   setExportState({ playlistId: id, mode: 'rekordbox' })
