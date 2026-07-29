@@ -399,22 +399,27 @@ function SettingsModal({ onClose }) {
                           />
                         ) : (
                           <span className="library-card-name">
+                            <button
+                              className="library-rename-btn"
+                              title="Rename"
+                              aria-label="Rename library"
+                              onClick={() => {
+                                setRenamingId(lib.id);
+                                setRenameInput(lib.name);
+                              }}
+                            >
+                              ✎
+                            </button>
                             {lib.name}
                             {lib.id === currentLibraryId && (
                               <span className="library-active-badge">current</span>
                             )}
+                            <span className="library-size-badge">
+                              {formatBytes(librarySizes[lib.id])}
+                            </span>
                           </span>
                         )}
                         <div className="library-card-actions">
-                          <button
-                            className="btn-secondary"
-                            onClick={() => {
-                              setRenamingId(lib.id);
-                              setRenameInput(lib.name);
-                            }}
-                          >
-                            Rename
-                          </button>
                           {lib.id !== currentLibraryId && (
                             <button
                               className="btn-secondary"
@@ -433,9 +438,6 @@ function SettingsModal({ onClose }) {
                         >
                           {lib.effective_root_path ?? lib.root_path}
                         </div>
-                        <span className="settings-size-display">
-                          {formatBytes(librarySizes[lib.id])}
-                        </span>
                         <button
                           className="btn-secondary"
                           onClick={() => handleBrowseLibrary(lib.id)}
