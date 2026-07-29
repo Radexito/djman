@@ -120,12 +120,14 @@ const mockGetTrackByHash = vi.fn();
 const mockAddTrack = vi.fn().mockReturnValue(99);
 const mockUpdateTrack = vi.fn();
 const mockGetTrackById = vi.fn();
+const mockGetTracks = vi.fn().mockReturnValue([]);
 
 vi.mock('../db/trackRepository.js', () => ({
   getTrackByHash: (...args) => mockGetTrackByHash(...args),
   addTrack: (...args) => mockAddTrack(...args),
   updateTrack: (...args) => mockUpdateTrack(...args),
   getTrackById: (...args) => mockGetTrackById(...args),
+  getTracks: (...args) => mockGetTracks(...args),
 }));
 
 const mockMoveFileSafe = vi.fn();
@@ -136,7 +138,11 @@ vi.mock('../utils/fsMove.js', () => ({
 // Import AFTER mocks so the module picks up all stubs
 import path from 'path';
 import fs from 'fs';
-import { importAudioFile, moveTrackToLibrary } from '../audio/importManager.js';
+import {
+  importAudioFile,
+  moveTrackToLibrary,
+  convertStorageFormat,
+} from '../audio/importManager.js';
 import cryptoDefault from 'crypto';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -154,6 +160,7 @@ beforeEach(() => {
   fs.existsSync.mockReset().mockReturnValue(false);
   mockMoveFileSafe.mockReset();
   mockGetTrackById.mockReset();
+  mockGetTracks.mockReset().mockReturnValue([]);
   // Restore default hash implementation after clearAllMocks
   cryptoDefault.createHash.mockImplementation(() => ({
     update() {
@@ -444,6 +451,77 @@ describe('importAudioFile — readable storage format', () => {
     expect(destPath).toBe(
       path.join('/tmp/djman-test', 'libraries', '2', 'audio', 'de', `${FAKE_HASH}.mp3`)
     );
+  });
+});
+
+describe('convertStorageFormat', () => {
+  it('moves an owned track to the new layout and updates its file_path', () => {
+    mockLibraries.get(1).storage_format = 'hashed';
+    mockGetTracks.mockReturnValue([
+      {
+        id: 5,
+        file_path: '/tmp/djman-test/audio/de/deadbeef.mp3',
+        file_hash: FAKE_HASH,
+        is_linked: 0,
+        artist: 'A',
+        title: 'T',
+      },
+    ]);
+    fs.existsSync.mockImplementation((p) => p === '/tmp/djman-test/audio/de/deadbeef.mp3');
+
+    const result = convertStorageFormat(1, 'readable');
+
+    expect(result).toEqual({ moved: 1, total: 1 });
+    expect(mockMoveFileSafe).toHaveBeenCalledWith(
+      '/tmp/djman-test/audio/de/deadbeef.mp3',
+      path.join('/tmp/djman-test', 'audio', 'A', 'A - T.mp3')
+    );
+    expect(mockUpdateTrack).toHaveBeenCalledWith(5, {
+      file_path: path.join('/tmp/djman-test', 'audio', 'A', 'A - T.mp3'),
+    });
+  });
+
+  it('is a no-op when the library is already in the requested format', () => {
+    mockLibraries.get(1).storage_format = 'hashed';
+    const result = convertStorageFormat(1, 'hashed');
+    expect(result).toEqual({ moved: 0, total: 0 });
+    expect(mockGetTracks).not.toHaveBeenCalled();
+  });
+
+  it('skips linked tracks entirely — their file has no hash and lives outside app storage', () => {
+    mockLibraries.get(1).storage_format = 'hashed';
+    mockGetTracks.mockReturnValue([
+      {
+        id: 5,
+        file_path: '/external/mixtape/track.mp3',
+        file_hash: null,
+        is_linked: 1,
+        artist: 'Ext Artist',
+        title: 'Ext Title',
+      },
+    ]);
+    fs.existsSync.mockImplementation((p) => p === '/external/mixtape/track.mp3');
+
+    expect(() => convertStorageFormat(1, 'readable')).not.toThrow();
+    expect(mockMoveFileSafe).not.toHaveBeenCalled();
+    expect(mockUpdateTrack).not.toHaveBeenCalled();
+  });
+
+  it('does not crash converting hashed<-readable when a linked track (null hash) is present', () => {
+    mockLibraries.get(1).storage_format = 'readable';
+    mockGetTracks.mockReturnValue([
+      {
+        id: 5,
+        file_path: '/external/mixtape/track.mp3',
+        file_hash: null,
+        is_linked: 1,
+        artist: 'Ext Artist',
+        title: 'Ext Title',
+      },
+    ]);
+    fs.existsSync.mockImplementation((p) => p === '/external/mixtape/track.mp3');
+
+    expect(() => convertStorageFormat(1, 'hashed')).not.toThrow();
   });
 });
 

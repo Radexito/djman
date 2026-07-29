@@ -160,7 +160,9 @@ export function convertStorageFormat(libraryId, newFormat) {
 
   for (const track of tracks) {
     const oldPath = track.file_path;
-    if (fs.existsSync(oldPath)) {
+    // Linked tracks live wherever the user put them, outside app-managed
+    // storage, and have no file_hash — storage format doesn't apply to them.
+    if (!track.is_linked && fs.existsSync(oldPath)) {
       const ext = path.extname(oldPath);
       const newPath = getAudioStoragePath(
         track.file_hash,
