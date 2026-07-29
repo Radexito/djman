@@ -1193,22 +1193,34 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     async (targetLibraryId, targetIds) => {
       setContextMenu(null);
       if (!targetIds?.length) return;
-      let moved = 0;
+      const movedIds = [];
       let failed = 0;
       for (const id of targetIds) {
         try {
           await window.api.moveTrackToLibrary(id, targetLibraryId);
-          moved++;
+          movedIds.push(id);
         } catch (err) {
           console.error('moveTrackToLibrary failed:', err);
           failed++;
         }
       }
-      if (moved > 0) {
+      if (movedIds.length > 0) {
         setTracks((prev) =>
-          prev.map((t) => (targetIds.includes(t.id) ? { ...t, library_id: targetLibraryId } : t))
+          prev.map((t) => (movedIds.includes(t.id) ? { ...t, library_id: targetLibraryId } : t))
+        );
+        // Keep an already-open Edit Details panel in sync (same fix as the
+        // library-move/storage-format case above) — otherwise it keeps
+        // showing the track's old library after a move.
+        setDetailsTrack((prev) =>
+          prev && movedIds.includes(prev.id) ? { ...prev, library_id: targetLibraryId } : prev
+        );
+        setDetailsBulkTracks((prev) =>
+          prev
+            ? prev.map((t) => (movedIds.includes(t.id) ? { ...t, library_id: targetLibraryId } : t))
+            : prev
         );
       }
+      const moved = movedIds.length;
       if (failed === 0) {
         showToast(`Moved ${moved} track${moved !== 1 ? 's' : ''} to library.`);
       } else if (moved === 0) {
