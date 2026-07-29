@@ -6,6 +6,7 @@ import {
   getTrackByHash,
   updateTrack,
   removeTrack,
+  getTrackCountByFilePath,
   getTrackIds,
   normalizeLibrary,
   clearTracks,
@@ -339,6 +340,22 @@ describe('trackRepository', () => {
       const id2 = addTrack({ ...SAMPLE, file_hash: 'other', file_path: '/tmp/other.mp3' });
       removeTrack(id1);
       expect(getTrackById(id2)).toBeDefined();
+    });
+  });
+
+  describe('getTrackCountByFilePath', () => {
+    it('returns 0 when no track references the path', () => {
+      expect(getTrackCountByFilePath('/tmp/nope.mp3')).toBe(0);
+    });
+
+    it('counts tracks sharing the same file_path', () => {
+      const id1 = addTrack(SAMPLE);
+      const id2 = addTrack({ ...SAMPLE, file_hash: 'dup', file_path: SAMPLE.file_path });
+      expect(getTrackCountByFilePath(SAMPLE.file_path)).toBe(2);
+      removeTrack(id1);
+      expect(getTrackCountByFilePath(SAMPLE.file_path)).toBe(1);
+      removeTrack(id2);
+      expect(getTrackCountByFilePath(SAMPLE.file_path)).toBe(0);
     });
   });
 

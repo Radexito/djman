@@ -1156,8 +1156,8 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     const n = targetIds.length;
     const msg =
       n === 1
-        ? 'Remove this track from your library? This cannot be undone.'
-        : `Remove ${n} tracks from your library? This cannot be undone.`;
+        ? 'Remove this track from your library? Imported tracks also have their audio file deleted from disk. This cannot be undone.'
+        : `Remove ${n} tracks from your library? Imported tracks also have their audio files deleted from disk. This cannot be undone.`;
     if (!window.confirm(msg)) return;
     if (currentTrack && targetIds.includes(currentTrack.id)) stop();
     setContextMenu(null);

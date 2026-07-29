@@ -410,6 +410,11 @@ export function removeTrack(id) {
   db.prepare('DELETE FROM tracks WHERE id = ?').run(id);
 }
 
+/** Counts tracks still referencing this file_path — used to avoid deleting a file that another track row still points at. */
+export function getTrackCountByFilePath(filePath) {
+  return db.prepare('SELECT COUNT(*) AS n FROM tracks WHERE file_path = ?').get(filePath).n;
+}
+
 export function normalizeLibrary(targetLufs) {
   const info = db
     .prepare(
