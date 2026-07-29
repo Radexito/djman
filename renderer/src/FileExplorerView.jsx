@@ -619,6 +619,14 @@ export default function FileExplorerView({ style }) {
     async (dirPath, recursive, playlistId = null) => {
       const res = await window.api.linkDirectory(dirPath, recursive, playlistId);
       showToast(`Linked ${res.linked}/${res.total} tracks`);
+      if (res.filePaths?.length) {
+        const tracks = await window.api.getTracksByPaths(res.filePaths);
+        setTracksMap((prev) => {
+          const next = new Map(prev);
+          tracks.forEach((t) => next.set(t.file_path, t));
+          return next;
+        });
+      }
     },
     [showToast]
   );
