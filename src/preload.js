@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('api', {
   // Multiple libraries (#390) — all active at once, no switching/restart
   // except to relocate the database file itself (moveDatabase).
   listLibraries: () => ipcRenderer.invoke('list-libraries'),
+  getLibrarySize: (libraryId) => ipcRenderer.invoke('get-library-size', libraryId),
   getCurrentLibraryId: () => ipcRenderer.invoke('get-current-library-id'),
   setCurrentLibraryId: (id) => ipcRenderer.invoke('set-current-library-id', id),
   createLibrary: (opts) => ipcRenderer.invoke('create-library', opts),
@@ -107,6 +108,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeAllListeners('convert-storage-format-progress');
   },
   getDbPath: () => ipcRenderer.invoke('get-db-path'),
+  getDbSize: () => ipcRenderer.invoke('get-db-size'),
   moveDatabase: (newDir) => ipcRenderer.invoke('move-database', newDir),
   normalizeLibrary: () => ipcRenderer.invoke('normalize-library'),
   getNormalizedCount: () => ipcRenderer.invoke('get-normalized-count'),

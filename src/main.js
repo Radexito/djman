@@ -79,6 +79,7 @@ import {
   getStorageFormat,
   convertStorageFormat,
   moveTrackToLibrary,
+  getLibraryDiskUsage,
 } from './audio/importManager.js';
 import {
   listLibraries,
@@ -501,7 +502,14 @@ ipcMain.handle('move-library', async (event, newDir, libraryId) => {
 // active/visible at the same time — no restart to "switch" between them.
 // "Current library" only affects where new imports land.
 
-ipcMain.handle('list-libraries', () => listLibraries());
+ipcMain.handle('list-libraries', () =>
+  // root_path is null for a library on its (unscoped-by-user) default path —
+  // resolve it so the renderer always has a real path to display.
+  listLibraries().map((lib) => ({ ...lib, effective_root_path: getLibraryBase(lib.id) }))
+);
+ipcMain.handle('get-library-size', (_, libraryId) =>
+  getLibraryDiskUsage(libraryId ?? getCurrentLibraryId())
+);
 ipcMain.handle('get-current-library-id', () => getCurrentLibraryId());
 ipcMain.handle('set-current-library-id', (_, id) => setCurrentLibraryId(id));
 ipcMain.handle('create-library', (_, opts) => {
@@ -527,6 +535,13 @@ ipcMain.handle('convert-storage-format', (_, libraryId, newFormat) =>
 // the database file itself can't be relocated while better-sqlite3 has it
 // open — close it, move it, record the new location, then restart.
 ipcMain.handle('get-db-path', () => getDbPath(app.getPath('userData')));
+ipcMain.handle('get-db-size', () => {
+  try {
+    return fs.statSync(getDbPath(app.getPath('userData'))).size;
+  } catch {
+    return 0;
+  }
+});
 ipcMain.handle('move-database', async (_, newDir) => {
   const oldPath = getDbPath(app.getPath('userData'));
   const newPath = path.join(newDir, path.basename(oldPath));

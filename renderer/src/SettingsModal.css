@@ -295,6 +295,14 @@
   white-space: nowrap;
   padding: 4px 0;
 }
+.settings-size-display {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-family: monospace;
+  color: #a6adc8;
+  white-space: nowrap;
+  padding: 4px 8px;
+}
 .move-progress {
   margin-top: 0.5rem;
 }
@@ -460,6 +468,7 @@
 }
 .library-card--new {
   border-style: dashed;
+  margin-top: 10px;
 }
 .library-card-header {
   display: flex;
@@ -484,6 +493,35 @@
   border-radius: 4px;
   padding: 1px 6px;
   font-weight: 400;
+}
+.library-size-badge {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: #a6adc8;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-weight: 400;
+  font-family: monospace;
+}
+.library-rename-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.library-rename-btn:hover {
+  background: #2a2a2a;
+  color: #ccc;
 }
 .library-card-actions {
   display: flex;

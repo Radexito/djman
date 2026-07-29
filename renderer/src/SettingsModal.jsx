@@ -3,6 +3,20 @@ import './SettingsModal.css';
 
 const DEFAULT_TARGET = -9;
 
+// MB and up — sub-megabyte sizes just round down to "0.0 MB" rather than
+// switching to bytes/KB, since libraries are never meaningfully that small.
+const SIZE_UNITS = ['MB', 'GB', 'TB'];
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  const mb = bytes / 1024 ** 2;
+  const exp = Math.max(
+    0,
+    Math.min(Math.floor(Math.log(mb) / Math.log(1024)), SIZE_UNITS.length - 1)
+  );
+  const value = mb / 1024 ** exp;
+  return `${value.toFixed(1)} ${SIZE_UNITS[exp]}`;
+}
+
 const COOKIE_BROWSERS = [
   { value: '', label: 'None (not logged in)' },
   { value: 'chrome', label: 'Chrome' },
@@ -59,10 +73,20 @@ function SettingsModal({ onClose }) {
 
   // Database location — a single file shared by all libraries
   const [dbPath, setDbPath] = useState('');
+  const [dbSize, setDbSize] = useState(0);
   const [confirmMoveDb, setConfirmMoveDb] = useState(null); // pending new dir path
 
+  // Disk usage per library, keyed by library id — fetched alongside the
+  // library list itself since both change together (move/convert/create).
+  const [librarySizes, setLibrarySizes] = useState({});
+
   const refreshLibraries = useCallback(() => {
-    window.api.listLibraries().then(setLibraries);
+    window.api.listLibraries().then((libs) => {
+      setLibraries(libs);
+      Promise.all(
+        libs.map((l) => window.api.getLibrarySize(l.id).then((size) => [l.id, size]))
+      ).then((pairs) => setLibrarySizes(Object.fromEntries(pairs)));
+    });
     window.api.getCurrentLibraryId().then(setCurrentLibraryId);
   }, []);
 
@@ -96,6 +120,7 @@ function SettingsModal({ onClose }) {
     if (activeSection === 'library') {
       refreshLibraries();
       window.api.getDbPath().then(setDbPath);
+      window.api.getDbSize().then(setDbSize);
     }
     if (activeSection === 'updates') {
       window.api.getDepVersions().then(setDepVersions);
@@ -374,22 +399,27 @@ function SettingsModal({ onClose }) {
                           />
                         ) : (
                           <span className="library-card-name">
+                            <button
+                              className="library-rename-btn"
+                              title="Rename"
+                              aria-label="Rename library"
+                              onClick={() => {
+                                setRenamingId(lib.id);
+                                setRenameInput(lib.name);
+                              }}
+                            >
+                              ✎
+                            </button>
                             {lib.name}
                             {lib.id === currentLibraryId && (
                               <span className="library-active-badge">current</span>
                             )}
+                            <span className="library-size-badge">
+                              {formatBytes(librarySizes[lib.id])}
+                            </span>
                           </span>
                         )}
                         <div className="library-card-actions">
-                          <button
-                            className="btn-secondary"
-                            onClick={() => {
-                              setRenamingId(lib.id);
-                              setRenameInput(lib.name);
-                            }}
-                          >
-                            Rename
-                          </button>
                           {lib.id !== currentLibraryId && (
                             <button
                               className="btn-secondary"
@@ -404,9 +434,9 @@ function SettingsModal({ onClose }) {
                       <div className="settings-row settings-row-action">
                         <div
                           className="settings-path-display"
-                          title={lib.root_path || '(default location)'}
+                          title={lib.effective_root_path ?? lib.root_path}
                         >
-                          {lib.root_path || '(default location)'}
+                          {lib.effective_root_path ?? lib.root_path}
                         </div>
                         <button
                           className="btn-secondary"
@@ -544,13 +574,15 @@ function SettingsModal({ onClose }) {
               <div className="settings-group">
                 <div className="settings-group-title">Database Location</div>
                 <p className="settings-group-desc">
-                  Where the single shared database file lives (all libraries' tracks, playlists, and
-                  settings). Moving it closes and restarts the app.
+                  The metadata database — track info, playlists, cue points, and settings for every
+                  library. This is not where your audio files are stored; see each library's own
+                  folder above. Moving it closes and restarts the app.
                 </p>
                 <div className="settings-row settings-row-action">
                   <div className="settings-path-display" title={dbPath}>
                     {dbPath || '…'}
                   </div>
+                  <span className="settings-size-display">{formatBytes(dbSize)}</span>
                   <button className="btn-secondary" onClick={handleBrowseDatabase}>
                     Change…
                   </button>

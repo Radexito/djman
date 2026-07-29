@@ -98,6 +98,8 @@ vi.mock('fs', () => {
     copyFileSync: vi.fn(),
     mkdirSync: vi.fn(),
     createReadStream: vi.fn().mockImplementation(makeStream),
+    readdirSync: vi.fn().mockReturnValue([]),
+    statSync: vi.fn().mockReturnValue({ size: 0 }),
   };
   return { default: fsMock, ...fsMock };
 });
@@ -142,6 +144,7 @@ import {
   importAudioFile,
   moveTrackToLibrary,
   convertStorageFormat,
+  getLibraryDiskUsage,
 } from '../audio/importManager.js';
 import cryptoDefault from 'crypto';
 
@@ -651,5 +654,47 @@ describe('moveTrackToLibrary', () => {
       library_id: 1,
     });
     await expect(moveTrackToLibrary(5, 999)).rejects.toThrow('Target library not found');
+  });
+});
+
+describe('getLibraryDiskUsage', () => {
+  it('sums file sizes recursively across the library audio and artwork bases', () => {
+    // Library 1 is the default library (see mockGetDefaultLibraryId), so its
+    // audio/artwork bases resolve to the mocked userData dir unscoped.
+    const audioBase = path.join('/tmp/djman-test', 'audio');
+    const artworkBase = path.join('/tmp/djman-test', 'artwork');
+    fs.readdirSync.mockImplementation((dir) => {
+      if (dir === audioBase) {
+        return [
+          { name: 'de', isDirectory: () => true, isFile: () => false },
+          { name: 'top.mp3', isDirectory: () => false, isFile: () => true },
+        ];
+      }
+      if (dir === path.join(audioBase, 'de')) {
+        return [{ name: 'deadbeef.mp3', isDirectory: () => false, isFile: () => true }];
+      }
+      if (dir === artworkBase) {
+        return [{ name: 'cover.jpg', isDirectory: () => false, isFile: () => true }];
+      }
+      throw new Error(`unexpected readdirSync(${dir})`);
+    });
+    fs.statSync.mockImplementation((file) => {
+      const sizes = {
+        [path.join(audioBase, 'top.mp3')]: 100,
+        [path.join(audioBase, 'de', 'deadbeef.mp3')]: 200,
+        [path.join(artworkBase, 'cover.jpg')]: 50,
+      };
+      return { size: sizes[file] ?? 0 };
+    });
+
+    expect(getLibraryDiskUsage(1)).toBe(350);
+  });
+
+  it('returns 0 when a base directory does not exist yet', () => {
+    fs.readdirSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+
+    expect(getLibraryDiskUsage(1)).toBe(0);
   });
 });
