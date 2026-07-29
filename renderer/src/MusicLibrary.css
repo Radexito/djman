@@ -166,6 +166,19 @@
   cursor: default;
 }
 
+/* Shown only when more than one library exists (#390) */
+.cell-library-badge {
+  font-size: 10px;
+  flex-shrink: 0;
+  margin-right: 5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #313244;
+  color: #a6adc8;
+  cursor: default;
+  white-space: nowrap;
+}
+
 .cell-title-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -525,6 +538,17 @@
   border-radius: 50%;
   margin-right: 5px;
   vertical-align: middle;
+}
+
+.context-menu-item--library {
+  justify-content: space-between;
+}
+
+.ctx-library-free {
+  font-size: 11px;
+  color: #888;
+  margin-left: 12px;
+  white-space: nowrap;
 }
 
 .context-menu-item--header {

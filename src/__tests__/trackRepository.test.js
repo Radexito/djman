@@ -15,6 +15,7 @@ import {
   clearLegacyNormalizedPaths,
   resetNormalization,
 } from '../db/trackRepository.js';
+import { createLibrary } from '../db/libraryRepository.js';
 
 const SAMPLE = {
   title: 'Test Track',
@@ -309,6 +310,20 @@ describe('trackRepository', () => {
       expect(track.bpm).toBe(128);
       expect(track.key_raw).toBe('Am');
       expect(track.title).toBe('Test Track'); // unchanged
+    });
+
+    it('persists library_id and is_linked (used by moveTrackToLibrary)', () => {
+      const id = addTrack(SAMPLE);
+      const targetLibrary = createLibrary({ name: 'Backup' });
+      updateTrack(id, {
+        library_id: targetLibrary.id,
+        is_linked: 0,
+        file_path: '/tmp/new/location.mp3',
+      });
+      const track = getTrackById(id);
+      expect(track.library_id).toBe(targetLibrary.id);
+      expect(track.is_linked).toBe(0);
+      expect(track.file_path).toBe('/tmp/new/location.mp3');
     });
   });
 
