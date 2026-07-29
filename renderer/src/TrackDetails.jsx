@@ -131,8 +131,9 @@ export default function TrackDetails({
     [track, onSave]
   );
 
-  const currentLibraryName =
-    libraries.find((l) => l.id === track?.library_id)?.name ?? (track?.library_id ? '—' : null);
+  const currentLibraryName = track?.is_linked
+    ? null
+    : (libraries.find((l) => l.id === track?.library_id)?.name ?? (track?.library_id ? '—' : null));
   const otherLibraries = libraries.filter((l) => l.id !== track?.library_id);
 
   const handleChange = useCallback((key, value) => {
@@ -356,7 +357,7 @@ export default function TrackDetails({
           </div>
           <div className="track-details__location-row">
             <span className="track-details__label">Library</span>
-            <span>{currentLibraryName ?? '—'}</span>
+            {!track.is_linked && <span>{currentLibraryName ?? '—'}</span>}
             {track.is_linked ? (
               libraries.length > 0 && (
                 <>

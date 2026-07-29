@@ -1886,7 +1886,7 @@ ipcMain.handle('link-directory', async (_, { dirPath, recursive, playlistId }) =
 
   send('library-updated');
   if (playlistId) send('playlists-updated');
-  return { ok: true, linked, total: filePaths.length };
+  return { ok: true, linked, total: filePaths.length, filePaths };
 });
 
 ipcMain.handle('remap-track', async (_, { trackId, newPath }) => {

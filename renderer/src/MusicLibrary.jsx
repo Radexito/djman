@@ -341,7 +341,7 @@ function LibraryRow({
                 🔗
               </span>
             ) : null}
-            {libraryNames?.has(t.library_id) ? (
+            {!t.is_linked && libraryNames?.has(t.library_id) ? (
               <span
                 className="cell-library-badge"
                 title={`Library: ${libraryNames.get(t.library_id)}`}
@@ -472,7 +472,7 @@ function SortableRow({
                 🔗
               </span>
             ) : null}
-            {libraryNames?.has(t.library_id) ? (
+            {!t.is_linked && libraryNames?.has(t.library_id) ? (
               <span
                 className="cell-library-badge"
                 title={`Library: ${libraryNames.get(t.library_id)}`}
@@ -1783,7 +1783,10 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                     {librarySubmenu !== null && librarySubmenu.length > 1 && (
                       <SubItem id="move-to-library" label="📚 Move to library" wide>
                         {librarySubmenu.map((lib) => {
-                          const isCurrent = contextMenu.track?.library_id === lib.id;
+                          const targetTracks = contextMenu.targetTracks ?? [];
+                          const isCurrent =
+                            targetTracks.length > 0 &&
+                            targetTracks.every((t) => !t.is_linked && t.library_id === lib.id);
                           return (
                             <div
                               key={lib.id}
