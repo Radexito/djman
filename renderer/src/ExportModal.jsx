@@ -270,6 +270,10 @@ function ExportModal({ onClose, playlistId, initialMode }) {
               You can still export to this folder (e.g. to inspect the files or copy manually), or
               reformat the drive to FAT32 first.
             </p>
+            <p className="export-needs-format-hint">
+              <strong>Note:</strong> if you export anyway, Rekordbox and CDJ/XDJ players will not be
+              able to read this drive — Pioneer hardware only recognizes FAT32 or exFAT.
+            </p>
             <div className="export-needs-format-actions">
               <button
                 className="export-option-btn export-option-btn--secondary"
@@ -305,6 +309,10 @@ function ExportModal({ onClose, playlistId, initialMode }) {
             <p className="export-needs-format-hint">
               You can still export to this folder as-is, or choose a different, removable drive to
               format.
+            </p>
+            <p className="export-needs-format-hint">
+              <strong>Note:</strong> if you export anyway, Rekordbox and CDJ/XDJ players will not be
+              able to read this drive — Pioneer hardware only recognizes FAT32 or exFAT.
             </p>
             <div className="export-needs-format-actions">
               <button
