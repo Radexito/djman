@@ -16,6 +16,10 @@ import { TidalDownloadProvider } from './TidalDownloadContext.jsx';
 import { DepsOverlay } from './DepsOverlay.jsx';
 import './App.css';
 
+// Tabs that don't use the shared MusicLibrary search bar — clicking one of
+// these again shouldn't try to clear a search that isn't showing there.
+const NON_SEARCHABLE_TABS = new Set(['download', 'tidal', 'cloud-search', 'explorer']);
+
 function App() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('music');
   const [showSettings, setShowSettings] = useState(false);
@@ -38,7 +42,7 @@ function App() {
   };
 
   const handleMenuSelect = (id) => {
-    if (id === 'music' && selectedPlaylistId === 'music') setSearch('');
+    if (id === selectedPlaylistId && !NON_SEARCHABLE_TABS.has(id)) setSearch('');
     setSelectedPlaylistId(id);
   };
 
