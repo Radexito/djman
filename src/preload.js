@@ -36,8 +36,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Import
   selectAudioFiles: () => ipcRenderer.invoke('select-audio-files'),
-  importAudioFiles: (files, playlistId) =>
-    ipcRenderer.invoke('import-audio-files', files, playlistId),
+  importAudioFiles: (files, playlistId, libraryId) =>
+    ipcRenderer.invoke('import-audio-files', files, playlistId, libraryId),
 
   // Playlists
   getPlaylists: () => ipcRenderer.invoke('get-playlists'),
@@ -84,13 +84,30 @@ contextBridge.exposeInMainWorld('api', {
   // Settings
   getSetting: (key, def) => ipcRenderer.invoke('get-setting', key, def),
   setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
-  getLibraryPath: () => ipcRenderer.invoke('get-library-path'),
-  moveLibrary: (newDir) => ipcRenderer.invoke('move-library', newDir),
+  getLibraryPath: (libraryId) => ipcRenderer.invoke('get-library-path', libraryId),
+  moveLibrary: (newDir, libraryId) => ipcRenderer.invoke('move-library', newDir, libraryId),
   openDirDialog: () => ipcRenderer.invoke('open-dir-dialog'),
   onMoveLibraryProgress: (cb) => {
     ipcRenderer.on('move-library-progress', (_, data) => cb(data));
     return () => ipcRenderer.removeAllListeners('move-library-progress');
   },
+  // Multiple libraries (#390) — all active at once, no switching/restart
+  // except to relocate the database file itself (moveDatabase).
+  listLibraries: () => ipcRenderer.invoke('list-libraries'),
+  getCurrentLibraryId: () => ipcRenderer.invoke('get-current-library-id'),
+  setCurrentLibraryId: (id) => ipcRenderer.invoke('set-current-library-id', id),
+  createLibrary: (opts) => ipcRenderer.invoke('create-library', opts),
+  renameLibrary: (id, name) => ipcRenderer.invoke('rename-library', id, name),
+  getLibraryStorageFormat: (libraryId) =>
+    ipcRenderer.invoke('get-library-storage-format', libraryId),
+  convertStorageFormat: (libraryId, newFormat) =>
+    ipcRenderer.invoke('convert-storage-format', libraryId, newFormat),
+  onConvertStorageFormatProgress: (cb) => {
+    ipcRenderer.on('convert-storage-format-progress', (_, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('convert-storage-format-progress');
+  },
+  getDbPath: () => ipcRenderer.invoke('get-db-path'),
+  moveDatabase: (newDir) => ipcRenderer.invoke('move-database', newDir),
   normalizeLibrary: () => ipcRenderer.invoke('normalize-library'),
   getNormalizedCount: () => ipcRenderer.invoke('get-normalized-count'),
   normalizeTracksAudio: (payload) => ipcRenderer.invoke('normalize-tracks-audio', payload),
@@ -243,10 +260,12 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('link-directory', { dirPath, recursive, playlistId }),
   remapTrack: (trackId, newPath) => ipcRenderer.invoke('remap-track', { trackId, newPath }),
   remapFolder: (oldDir) => ipcRenderer.invoke('remap-folder', { oldDir }),
+  moveTrackToLibrary: (trackId, targetLibraryId) =>
+    ipcRenderer.invoke('move-track-to-library', { trackId, targetLibraryId }),
   checkLinkedTrackStatus: (trackIds) => ipcRenderer.invoke('check-linked-track-status', trackIds),
   getLinkedTracksBasic: () => ipcRenderer.invoke('get-linked-tracks-basic'),
 
-  clearLibrary: () => ipcRenderer.invoke('clear-library'),
+  clearLibrary: (libraryId) => ipcRenderer.invoke('clear-library', libraryId),
   clearUserData: () => ipcRenderer.invoke('clear-user-data'),
   getLogDir: () => ipcRenderer.invoke('get-log-dir'),
   openLogDir: () => ipcRenderer.invoke('open-log-dir'),

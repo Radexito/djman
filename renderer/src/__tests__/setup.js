@@ -6,6 +6,18 @@ const noop = () => () => {}; // returns unsubscribe fn
 window.api = {
   getTracks: vi.fn().mockResolvedValue([]),
   getTrackIds: vi.fn().mockResolvedValue([]),
+  listLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Default', storage_format: 'hashed' }]),
+  getCurrentLibraryId: vi.fn().mockResolvedValue(1),
+  setCurrentLibraryId: vi.fn().mockResolvedValue(undefined),
+  createLibrary: vi
+    .fn()
+    .mockResolvedValue({ id: 2, name: 'New Library', storage_format: 'hashed' }),
+  renameLibrary: vi.fn().mockResolvedValue({ id: 1, name: 'Renamed' }),
+  getLibraryStorageFormat: vi.fn().mockResolvedValue('hashed'),
+  convertStorageFormat: vi.fn().mockResolvedValue({ moved: 0, total: 0 }),
+  onConvertStorageFormatProgress: vi.fn().mockImplementation(noop),
+  getDbPath: vi.fn().mockResolvedValue('/tmp/library.db'),
+  moveDatabase: vi.fn().mockResolvedValue(undefined),
   getUnavailableLinkedTracks: vi.fn().mockResolvedValue([]),
   getCuePoints: vi.fn().mockResolvedValue([]),
   addCuePoint: vi.fn().mockResolvedValue({ id: 1 }),
@@ -102,6 +114,7 @@ window.api = {
   linkDirectory: vi.fn().mockResolvedValue({ ok: true, linked: 0, total: 0 }),
   remapTrack: vi.fn().mockResolvedValue({ ok: true }),
   remapFolder: vi.fn().mockResolvedValue({ ok: true, count: 0 }),
+  moveTrackToLibrary: vi.fn().mockResolvedValue({ ok: true, moved: true }),
   checkLinkedTrackStatus: vi.fn().mockResolvedValue([]),
   getLinkedTracksBasic: vi.fn().mockResolvedValue([]),
   checkUsbFormat: vi

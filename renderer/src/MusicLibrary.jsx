@@ -227,6 +227,7 @@ function LibraryRow({
   mediaPort,
   newTrackIds,
   onAnimationEnd,
+  libraryNames,
   unavailableLinkedIds,
 }) {
   const t = tracks[index];
@@ -319,11 +320,19 @@ function LibraryRow({
                 className="cell-linked-badge"
                 title={
                   isUnavailable
-                    ? 'File not found — may be on a disconnected drive'
-                    : 'Explorer-linked file'
+                    ? `File not found — may be on a disconnected drive\n${t.file_path}`
+                    : `Explorer-linked file\n${t.file_path}`
                 }
               >
                 🔗
+              </span>
+            ) : null}
+            {libraryNames?.has(t.library_id) ? (
+              <span
+                className="cell-library-badge"
+                title={`Library: ${libraryNames.get(t.library_id)}`}
+              >
+                {libraryNames.get(t.library_id)}
               </span>
             ) : null}
             <span className="cell-title-text">{t.title}</span>
@@ -355,6 +364,7 @@ function SortableRow({
   mediaPort,
   isNew,
   onAnimationEnd,
+  libraryNames,
   isUnavailable,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -441,11 +451,19 @@ function SortableRow({
                 className="cell-linked-badge"
                 title={
                   isUnavailable
-                    ? 'File not found — may be on a disconnected drive'
-                    : 'Explorer-linked file'
+                    ? `File not found — may be on a disconnected drive\n${t.file_path}`
+                    : `Explorer-linked file\n${t.file_path}`
                 }
               >
                 🔗
+              </span>
+            ) : null}
+            {libraryNames?.has(t.library_id) ? (
+              <span
+                className="cell-library-badge"
+                title={`Library: ${libraryNames.get(t.library_id)}`}
+              >
+                {libraryNames.get(t.library_id)}
               </span>
             ) : null}
             <span className="cell-title-text">{t.title}</span>
@@ -494,6 +512,15 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     updateQueue,
     unavailableLinkedIds = EMPTY_SET,
   } = usePlayer();
+
+  // Multiple libraries are all shown together (#390) — only worth labeling
+  // tracks by library once there's more than one to distinguish.
+  const [libraryNames, setLibraryNames] = useState(new Map());
+  useEffect(() => {
+    window.api.listLibraries().then((libs) => {
+      setLibraryNames(libs.length > 1 ? new Map(libs.map((l) => [l.id, l.name])) : new Map());
+    });
+  }, []);
 
   const [hideUnavailable, setHideUnavailable] = useState(
     () => localStorage.getItem('djman_hide_unavailable') === 'true'
@@ -1476,6 +1503,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                         mediaPort={mediaPort}
                         isNew={newTrackIds.has(t.id)}
                         onAnimationEnd={handleRowAnimationEnd}
+                        libraryNames={libraryNames}
                         isUnavailable={t.is_linked && unavailableLinkedIds.has(t.id)}
                       />
                     ))}
@@ -1524,6 +1552,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                 mediaPort,
                 newTrackIds,
                 onAnimationEnd: handleRowAnimationEnd,
+                libraryNames,
                 unavailableLinkedIds,
               }}
             />

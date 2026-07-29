@@ -191,6 +191,17 @@ function buildFiltersSQL(filters = []) {
   return { clauses, params };
 }
 
+/** IN-clause for an optional library_id filter — omitted entirely (all libraries) when unset. */
+function buildLibraryIdsSQL(libraryIds) {
+  if (!libraryIds || !libraryIds.length) return { clause: null, params: {} };
+  const params = {};
+  const placeholders = libraryIds.map((id, i) => {
+    params[`_lib${i}`] = id;
+    return `@_lib${i}`;
+  });
+  return { clause: `library_id IN (${placeholders.join(',')})`, params };
+}
+
 export function addTrack(track) {
   console.log('Adding track:', track);
   const stmt = db.prepare(`
@@ -199,14 +210,14 @@ export function addTrack(track) {
       file_path, file_hash, format, bitrate,
       year, label, genres, bpm,
       source_url, source_platform, source_quality, source_link,
-      user_tags, has_artwork, artwork_path, is_linked,
+      user_tags, has_artwork, artwork_path, is_linked, library_id,
       created_at
     ) VALUES (
       @title, @artist, @album, @duration,
       @file_path, @file_hash, @format, @bitrate,
       @year, @label, @genres, @bpm,
       @source_url, @source_platform, @source_quality, @source_link,
-      @user_tags, @has_artwork, @artwork_path, @is_linked,
+      @user_tags, @has_artwork, @artwork_path, @is_linked, @library_id,
       @created_at
     )
   `);
@@ -232,6 +243,7 @@ export function addTrack(track) {
     has_artwork: track.has_artwork ?? 0,
     artwork_path: track.artwork_path ?? null,
     is_linked: track.is_linked ?? 0,
+    library_id: track.library_id ?? null,
     created_at: Date.now(),
   });
 
@@ -260,15 +272,30 @@ export function updateTrack(id, data) {
   ).run({ id, ...safeData });
 }
 
-export function getTracks({ limit = 50, offset = 0, search = '', filters = [], playlistId } = {}) {
+export function getTracks({
+  limit = 50,
+  offset = 0,
+  search = '',
+  filters = [],
+  playlistId,
+  libraryIds,
+} = {}) {
   const { clauses: filterClauses, params: filterParams } = buildFiltersSQL(filters);
 
   // Plain-text search (title / artist / album)
   const textClause = search ? '(title LIKE @_q OR artist LIKE @_q OR album LIKE @_q)' : null;
   const textParams = search ? { _q: `%${search}%` } : {};
 
-  const allClauses = [...filterClauses, ...(textClause ? [textClause] : [])];
-  const allParams = { ...filterParams, ...textParams, limit, offset };
+  // Unified multi-library view: omit entirely to show all libraries at once,
+  // or restrict to a chosen set (library filter in the UI).
+  const { clause: libClause, params: libParams } = buildLibraryIdsSQL(libraryIds);
+
+  const allClauses = [
+    ...filterClauses,
+    ...(textClause ? [textClause] : []),
+    ...(libClause ? [libClause] : []),
+  ];
+  const allParams = { ...filterParams, ...textParams, ...libParams, limit, offset };
 
   if (playlistId) {
     const extra = allClauses.length ? `AND ${allClauses.join(' AND ')}` : '';
@@ -304,14 +331,19 @@ export function getTracks({ limit = 50, offset = 0, search = '', filters = [], p
     .all(allParams);
 }
 
-export function getTrackIds({ search = '', filters = [], playlistId } = {}) {
+export function getTrackIds({ search = '', filters = [], playlistId, libraryIds } = {}) {
   const { clauses: filterClauses, params: filterParams } = buildFiltersSQL(filters);
 
   const textClause = search ? '(title LIKE @_q OR artist LIKE @_q OR album LIKE @_q)' : null;
   const textParams = search ? { _q: `%${search}%` } : {};
+  const { clause: libClause, params: libParams } = buildLibraryIdsSQL(libraryIds);
 
-  const allClauses = [...filterClauses, ...(textClause ? [textClause] : [])];
-  const allParams = { ...filterParams, ...textParams };
+  const allClauses = [
+    ...filterClauses,
+    ...(textClause ? [textClause] : []),
+    ...(libClause ? [libClause] : []),
+  ];
+  const allParams = { ...filterParams, ...textParams, ...libParams };
 
   if (playlistId) {
     const extra = allClauses.length ? `AND ${allClauses.join(' AND ')}` : '';
@@ -428,6 +460,13 @@ export function resetNormalization(trackIds = null) {
 export function clearTracks() {
   console.log('Clearing all tracks from database');
   db.prepare(`DELETE FROM tracks`).run();
+  db.prepare(`VACUUM`).run();
+}
+
+/** Clears only one library's tracks — other libraries are untouched. */
+export function clearTracksForLibrary(libraryId) {
+  console.log(`Clearing all tracks for library ${libraryId}`);
+  db.prepare(`DELETE FROM tracks WHERE library_id = ?`).run(libraryId);
   db.prepare(`VACUUM`).run();
 }
 
