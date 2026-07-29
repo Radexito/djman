@@ -540,6 +540,17 @@
   vertical-align: middle;
 }
 
+.context-menu-item--library {
+  justify-content: space-between;
+}
+
+.ctx-library-free {
+  font-size: 11px;
+  color: #888;
+  margin-left: 12px;
+  white-space: nowrap;
+}
+
 .context-menu-item--header {
   padding: 5px 16px 3px;
   font-size: 11px;

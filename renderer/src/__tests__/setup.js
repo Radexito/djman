@@ -15,6 +15,16 @@ window.api = {
       effective_root_path: '/tmp/userData/audio',
     },
   ]),
+  listLibrariesWithFreeSpace: vi.fn().mockResolvedValue([
+    {
+      id: 1,
+      name: 'Default',
+      storage_format: 'hashed',
+      root_path: null,
+      effective_root_path: '/tmp/userData/audio',
+      free_bytes: 1024 ** 3,
+    },
+  ]),
   getLibrarySize: vi.fn().mockResolvedValue(0),
   getCurrentLibraryId: vi.fn().mockResolvedValue(1),
   setCurrentLibraryId: vi.fn().mockResolvedValue(undefined),

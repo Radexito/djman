@@ -80,6 +80,7 @@ import {
   convertStorageFormat,
   moveTrackToLibrary,
   getLibraryDiskUsage,
+  getLibraryFreeSpace,
 } from './audio/importManager.js';
 import {
   listLibraries,
@@ -509,6 +510,13 @@ ipcMain.handle('list-libraries', () =>
 );
 ipcMain.handle('get-library-size', (_, libraryId) =>
   getLibraryDiskUsage(libraryId ?? getCurrentLibraryId())
+);
+ipcMain.handle('list-libraries-with-free-space', () =>
+  listLibraries().map((lib) => ({
+    ...lib,
+    effective_root_path: getLibraryBase(lib.id),
+    free_bytes: getLibraryFreeSpace(lib.id),
+  }))
 );
 ipcMain.handle('get-current-library-id', () => getCurrentLibraryId());
 ipcMain.handle('set-current-library-id', (_, id) => setCurrentLibraryId(id));

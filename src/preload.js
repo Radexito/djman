@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('api', {
   // Multiple libraries (#390) — all active at once, no switching/restart
   // except to relocate the database file itself (moveDatabase).
   listLibraries: () => ipcRenderer.invoke('list-libraries'),
+  listLibrariesWithFreeSpace: () => ipcRenderer.invoke('list-libraries-with-free-space'),
   getLibrarySize: (libraryId) => ipcRenderer.invoke('get-library-size', libraryId),
   getCurrentLibraryId: () => ipcRenderer.invoke('get-current-library-id'),
   setCurrentLibraryId: (id) => ipcRenderer.invoke('set-current-library-id', id),

@@ -233,6 +233,46 @@ describe('context menu — submenu CSS classes', () => {
   });
 });
 
+// ── Move to library ───────────────────────────────────────────────────────────
+
+describe('context menu — move to library', () => {
+  it('does not show "Move to library" when only one library exists', async () => {
+    renderLibrary();
+    await openContextMenu('Track One');
+    await waitFor(() => expect(window.api.listLibrariesWithFreeSpace).toHaveBeenCalled());
+    expect(getSubmenuParent('📚 Move to library')).toBeNull();
+  });
+
+  it('shows each library with its free disk space when multiple libraries exist', async () => {
+    window.api.listLibrariesWithFreeSpace.mockResolvedValue([
+      { id: 1, name: 'Default', free_bytes: 5 * 1024 ** 3 },
+      { id: 2, name: 'Backup', free_bytes: 2 * 1024 ** 2 },
+    ]);
+    renderLibrary();
+    await openContextMenu('Track One');
+    await waitFor(() => expect(getSubmenuParent('📚 Move to library')).toBeTruthy());
+
+    fireEvent.mouseEnter(getSubmenuParent('📚 Move to library'));
+    expect(await screen.findByText('Backup')).toBeInTheDocument();
+    expect(screen.getByText('5.0 GB free')).toBeInTheDocument();
+    expect(screen.getByText('2.0 MB free')).toBeInTheDocument();
+  });
+
+  it('clicking a library calls moveTrackToLibrary with the track id and target library', async () => {
+    window.api.listLibrariesWithFreeSpace.mockResolvedValue([
+      { id: 1, name: 'Default', free_bytes: 5 * 1024 ** 3 },
+      { id: 2, name: 'Backup', free_bytes: 2 * 1024 ** 3 },
+    ]);
+    renderLibrary();
+    await openContextMenu('Track One');
+    await waitFor(() => expect(getSubmenuParent('📚 Move to library')).toBeTruthy());
+    fireEvent.mouseEnter(getSubmenuParent('📚 Move to library'));
+
+    fireEvent.click(await screen.findByText('Backup'));
+    await waitFor(() => expect(window.api.moveTrackToLibrary).toHaveBeenCalledWith(1, 2));
+  });
+});
+
 // ── Remove confirmation ───────────────────────────────────────────────────────
 
 describe('context menu — remove from library with confirmation', () => {
