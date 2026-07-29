@@ -466,8 +466,16 @@ ipcMain.handle('move-library', async (event, newDir, libraryId) => {
     moved++;
 
     const pct = Math.round((moved / total) * 100);
-    if (global.mainWindow)
+    if (global.mainWindow) {
       global.mainWindow.webContents.send('move-library-progress', { moved, total, pct });
+      // Keep the track list and any open Edit Details panel in sync — pass
+      // through the existing `analyzed` flag so this doesn't masquerade as
+      // a completed analysis for not-yet-analyzed tracks.
+      global.mainWindow.webContents.send('track-updated', {
+        trackId: track.id,
+        analysis: { file_path: newPath, analyzed: track.analyzed },
+      });
+    }
   }
 
   // Remove old empty shard dirs (best-effort)

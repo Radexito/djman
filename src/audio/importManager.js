@@ -173,6 +173,15 @@ export function convertStorageFormat(libraryId, newFormat) {
       if (newPath !== oldPath) {
         moveFileSafe(oldPath, newPath);
         updateTrack(track.id, { file_path: newPath });
+        // Keep the track list and any open Edit Details panel in sync —
+        // pass through the existing `analyzed` flag so this doesn't
+        // masquerade as a completed analysis for not-yet-analyzed tracks.
+        if (global.mainWindow) {
+          global.mainWindow.webContents.send('track-updated', {
+            trackId: track.id,
+            analysis: { file_path: newPath, analyzed: track.analyzed },
+          });
+        }
       }
     }
     moved++;

@@ -740,6 +740,10 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
 
       setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, ...merged } : t)));
 
+      // Keep an already-open Edit Details panel in sync (e.g. file_path
+      // changes after a library move or storage-format conversion)
+      setDetailsTrack((prev) => (prev && prev.id === trackId ? { ...prev, ...merged } : prev));
+
       // Keep PlayerContext's currentTrack in sync
       patchCurrentTrack(trackId, merged);
     });
