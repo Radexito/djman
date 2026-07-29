@@ -691,15 +691,15 @@ CRC-16/XMODEM: poly `0x1021`, init `0x0000`, no reflection.
 
 ## Waveform Resolution Summary
 
-| Section | Type     | Cols/sec | Columns | Bytes/col | Notes                   |
-| ------- | -------- | -------- | ------- | --------- | ------------------------ |
-| PWAV    | Overview | varies   | 400     | 1         | Fixed, spans full track |
-| PWV2    | Overview | varies   | 100     | 1         | Fixed, spans full track |
-| PWV4    | Overview | varies   | 1200    | 6         | Fixed, spans full track |
+| Section | Type     | Cols/sec | Columns | Bytes/col | Notes                         |
+| ------- | -------- | -------- | ------- | --------- | ----------------------------- |
+| PWAV    | Overview | varies   | 400     | 1         | Fixed, spans full track       |
+| PWV2    | Overview | varies   | 100     | 1         | Fixed, spans full track       |
+| PWV4    | Overview | varies   | 1200    | 6         | Fixed, spans full track       |
 | PWV6    | Overview | varies   | 1200    | 3         | Fixed, spans full track (2EX) |
-| PWV3    | Scroll   | 100      | dynamic | 1         | 10 ms/col, mono         |
-| PWV5    | Scroll   | 100      | dynamic | 2         | 10 ms/col, RGB colour   |
-| PWV7    | Scroll   | 100      | dynamic | 3         | 10 ms/col, RGB colour (2EX) |
+| PWV3    | Scroll   | 100      | dynamic | 1         | 10 ms/col, mono               |
+| PWV5    | Scroll   | 100      | dynamic | 2         | 10 ms/col, RGB colour         |
+| PWV7    | Scroll   | 100      | dynamic | 3         | 10 ms/col, RGB colour (2EX)   |
 
 Native Rekordbox generates scroll waveforms at 150 cols/sec (≈6.67 ms/col), but
 CDJ hardware accepts non-native resolutions. This application generates at
