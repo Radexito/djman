@@ -21,6 +21,7 @@ const ALLOWED_TRACK_COLUMNS = new Set([
   'intro_secs',
   'outro_secs',
   'beatgrid',
+  'beatgrid_offset',
   'rating',
   'comments',
   'user_tags',
