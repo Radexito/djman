@@ -129,20 +129,57 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
       setDownloadStatus(new Map(statuses));
     }
 
-    // TIDAL supports a batch of selectedEntries in a single call.
+    // TIDAL supports a batch of selectedEntries in a single call, but an album/playlist
+    // result's `id` is the album/playlist id, not a track id — it must be expanded into
+    // its individual track entries first, the same way TidalDownloadView does, or the
+    // download URLs built from it point at nonexistent tracks.
     if (byTidal.length > 0) {
       for (const r of byTidal) statuses.set(resultKey(r), 'downloading');
       setDownloadStatus(new Map(statuses));
-      try {
-        const res = await window.api.tidalDownloadUrl({
-          url: byTidal[0].url,
-          selectedEntries: byTidal.map((r) => ({ id: r.id, title: r.title, artist: r.artist })),
-        });
-        for (const r of byTidal) statuses.set(resultKey(r), res.ok ? 'done' : 'failed');
-        if (!res.ok) setDownloadError(res.error || 'TIDAL download failed');
-      } catch (e) {
-        for (const r of byTidal) statuses.set(resultKey(r), 'failed');
-        setDownloadError(e.message ?? 'TIDAL download failed');
+
+      const trackEntries = [];
+      let expansionError = null;
+      for (const r of byTidal) {
+        if (r.type === 'track') {
+          trackEntries.push({ id: r.id, title: r.title, artist: r.artist });
+          continue;
+        }
+        try {
+          const info = await window.api.tidalFetchInfo(r.url);
+          if (!info.ok) {
+            expansionError = info.error || `Failed to expand ${r.type} "${r.title}"`;
+            statuses.set(resultKey(r), 'failed');
+            continue;
+          }
+          for (const entry of info.entries ?? []) {
+            trackEntries.push({ id: entry.id, title: entry.title, artist: entry.artist });
+          }
+        } catch (e) {
+          expansionError = e.message ?? `Failed to expand ${r.type} "${r.title}"`;
+          statuses.set(resultKey(r), 'failed');
+        }
+      }
+      setDownloadStatus(new Map(statuses));
+
+      if (trackEntries.length > 0) {
+        try {
+          const res = await window.api.tidalDownloadUrl({
+            url: byTidal[0].url,
+            selectedEntries: trackEntries,
+          });
+          for (const r of byTidal) {
+            if (statuses.get(resultKey(r)) === 'failed') continue;
+            statuses.set(resultKey(r), res.ok ? 'done' : 'failed');
+          }
+          if (!res.ok) setDownloadError(res.error || 'TIDAL download failed');
+        } catch (e) {
+          for (const r of byTidal) {
+            if (statuses.get(resultKey(r)) !== 'failed') statuses.set(resultKey(r), 'failed');
+          }
+          setDownloadError(e.message ?? 'TIDAL download failed');
+        }
+      } else if (expansionError) {
+        setDownloadError(expansionError);
       }
       setDownloadStatus(new Map(statuses));
     }
