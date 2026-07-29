@@ -24,7 +24,13 @@ export async function detectFilesystem(mountPath) {
   } catch {
     // If detection fails, we cannot confirm the device is removable — default to
     // "not removable" so a failed detection can never accidentally permit formatting.
-    return { fs: 'unknown', device: null, mountPoint: mountPath, needsFormat: false, removable: false };
+    return {
+      fs: 'unknown',
+      device: null,
+      mountPoint: mountPath,
+      needsFormat: false,
+      removable: false,
+    };
   }
 }
 
@@ -155,7 +161,13 @@ async function detectFilesystemLinux(mountPath) {
     };
   }
 
-  return { fs: 'unknown', device: null, mountPoint: mountPath, needsFormat: false, removable: false };
+  return {
+    fs: 'unknown',
+    device: null,
+    mountPoint: mountPath,
+    needsFormat: false,
+    removable: false,
+  };
 }
 
 function findLinuxDevice(devices, mountPath, parentInfo = {}) {
