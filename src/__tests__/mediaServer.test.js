@@ -157,6 +157,16 @@ describe('Security — path restriction', () => {
     const res = await httpGet(`http://127.0.0.1:${port}/${encoded}`);
     expect(res.status).toBe(403);
   });
+
+  // Regression for #401: the renderer's reachability probe (PlayerContext.jsx)
+  // deliberately hits a path outside any allowed base and expects a *resolved*
+  // response (any status) rather than a browser-level CORS network error. That
+  // only holds if error responses carry the same CORS header successful ones do.
+  it('includes Access-Control-Allow-Origin on a 403 response', async () => {
+    const outsidePath = path.join(tmpDir, '..', 'etc', 'passwd');
+    const res = await httpGet(`http://127.0.0.1:${port}${toUrlPath(outsidePath)}`);
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+  });
 });
 
 // ── Not found ─────────────────────────────────────────────────────────────────
@@ -166,6 +176,12 @@ describe('GET — missing file', () => {
     const missing = path.join(audioBase, 'nope.mp3');
     const res = await httpGet(`http://127.0.0.1:${port}${toUrlPath(missing)}`);
     expect(res.status).toBe(404);
+  });
+
+  it('includes Access-Control-Allow-Origin on a 404 response', async () => {
+    const missing = path.join(audioBase, 'nope.mp3');
+    const res = await httpGet(`http://127.0.0.1:${port}${toUrlPath(missing)}`);
+    expect(res.headers['access-control-allow-origin']).toBe('*');
   });
 });
 

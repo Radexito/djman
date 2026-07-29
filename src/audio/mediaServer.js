@@ -40,6 +40,15 @@ export function streamFile(stream, res) {
  */
 export function createMediaRequestHandler(audioBase, artworkBase = null, allowedBases = []) {
   return (req, res) => {
+    // Allow Web Audio API (createMediaElementSource) to process audio from any
+    // renderer origin. In dev mode the renderer runs at localhost:517x while the
+    // server is 127.0.0.1:PORT — different origins — so without this header
+    // Chromium outputs zeroes and the user hears silence. Applied to every
+    // response (including errors, declared outside the try so the catch block
+    // can use it too) so cross-origin callers — e.g. the reachability probe in
+    // PlayerContext.jsx — get a readable status instead of an opaque
+    // CORS-blocked network error.
+    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
     try {
       let urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
       if (process.platform === 'win32') {
@@ -52,7 +61,7 @@ export function createMediaRequestHandler(audioBase, artworkBase = null, allowed
       const inArtwork = artworkBase && urlPath.startsWith(artworkBase);
       const inAllowed = allowedBases.some((base) => urlPath.startsWith(base));
       if (!inAudio && !inArtwork && !inAllowed) {
-        res.writeHead(403);
+        res.writeHead(403, corsHeaders);
         res.end();
         return;
       }
@@ -62,12 +71,6 @@ export function createMediaRequestHandler(audioBase, artworkBase = null, allowed
       const ext = path.extname(urlPath).toLowerCase();
       const mime = IMAGE_MIME[ext] || AUDIO_MIME[ext] || (inArtwork ? 'image/jpeg' : 'audio/mpeg');
       const rangeHeader = req.headers['range'];
-
-      // Allow Web Audio API (createMediaElementSource) to process audio from any
-      // renderer origin. In dev mode the renderer runs at localhost:517x while the
-      // server is 127.0.0.1:PORT — different origins — so without this header
-      // Chromium outputs zeroes and the user hears silence.
-      const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
 
       if (req.method === 'OPTIONS') {
         res.writeHead(204, corsHeaders);
@@ -98,7 +101,7 @@ export function createMediaRequestHandler(audioBase, artworkBase = null, allowed
       }
     } catch (err) {
       if (err.code !== 'ENOENT') console.error('[media-server] error:', err.message);
-      res.writeHead(err.code === 'ENOENT' ? 404 : 500);
+      res.writeHead(err.code === 'ENOENT' ? 404 : 500, corsHeaders);
       res.end();
     }
   };

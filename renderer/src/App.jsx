@@ -4,6 +4,7 @@ import Sidebar from './Sidebar.jsx';
 import MusicLibrary from './MusicLibrary.jsx';
 import DownloadView from './DownloadView.jsx';
 import TidalDownloadView from './TidalDownloadView.jsx';
+import CloudSearchView from './CloudSearchView.jsx';
 import FileExplorerView from './FileExplorerView.jsx';
 import SettingsModal from './SettingsModal.jsx';
 import ExportModal from './ExportModal.jsx';
@@ -134,11 +135,17 @@ function App() {
                 onGoToLibrary={() => setSelectedPlaylistId('music')}
                 onGoToPlaylist={(id) => setSelectedPlaylistId(id)}
               />
+              <CloudSearchView
+                style={{ display: selectedPlaylistId === 'cloud-search' ? '' : 'none' }}
+                onGoToLibrary={() => setSelectedPlaylistId('music')}
+                onGoToTidalSetup={() => setSelectedPlaylistId('tidal')}
+              />
               <FileExplorerView
                 style={{ display: selectedPlaylistId === 'explorer' ? '' : 'none' }}
               />
               {selectedPlaylistId !== 'download' &&
                 selectedPlaylistId !== 'tidal' &&
+                selectedPlaylistId !== 'cloud-search' &&
                 selectedPlaylistId !== 'explorer' && (
                   <MusicLibrary
                     selectedPlaylist={selectedPlaylistId}

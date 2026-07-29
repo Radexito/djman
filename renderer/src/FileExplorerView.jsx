@@ -343,7 +343,14 @@ export default function FileExplorerView({ style }) {
     });
     window.api.getPlaylists().then(setPlaylists);
     window.api.getSetting('explorer_favourites', []).then((favs) => {
-      const parsed = typeof favs === 'string' ? JSON.parse(favs) : favs;
+      let parsed = favs;
+      if (typeof favs === 'string') {
+        try {
+          parsed = favs ? JSON.parse(favs) : [];
+        } catch {
+          parsed = []; // corrupt/legacy stored value — reset rather than crash
+        }
+      }
       setFavourites(Array.isArray(parsed) ? parsed : []);
     });
     const unsub = window.api.onPlaylistsUpdated(() => window.api.getPlaylists().then(setPlaylists));
@@ -355,7 +362,7 @@ export default function FileExplorerView({ style }) {
     setFavourites((prev) => {
       if (prev.some((f) => f.path === path)) return prev;
       const next = [...prev, { path, name }];
-      window.api.setSetting('explorer_favourites', next);
+      window.api.setSetting('explorer_favourites', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -363,7 +370,7 @@ export default function FileExplorerView({ style }) {
   const removeFavourite = useCallback((path) => {
     setFavourites((prev) => {
       const next = prev.filter((f) => f.path !== path);
-      window.api.setSetting('explorer_favourites', next);
+      window.api.setSetting('explorer_favourites', JSON.stringify(next));
       return next;
     });
   }, []);
