@@ -341,7 +341,7 @@ function LibraryRow({
                 🔗
               </span>
             ) : null}
-            {libraryNames?.has(t.library_id) ? (
+            {!t.is_linked && libraryNames?.has(t.library_id) ? (
               <span
                 className="cell-library-badge"
                 title={`Library: ${libraryNames.get(t.library_id)}`}
@@ -472,7 +472,7 @@ function SortableRow({
                 🔗
               </span>
             ) : null}
-            {libraryNames?.has(t.library_id) ? (
+            {!t.is_linked && libraryNames?.has(t.library_id) ? (
               <span
                 className="cell-library-badge"
                 title={`Library: ${libraryNames.get(t.library_id)}`}
