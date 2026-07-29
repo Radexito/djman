@@ -31,12 +31,24 @@ export async function detectFilesystem(mountPath) {
 async function detectFilesystemWindows(mountPath) {
   // mountPath is like "E:\" or "E:"
   const drive = mountPath.replace(/[/\\]/g, '').replace(/:$/, '');
-  const { stdout } = await execAsync(`fsutil fsinfo volumeinfo ${drive}: 2>&1`, {
-    windowsHide: true,
-  });
-  console.log(`[diag] fsutil volumeinfo ${drive}: stdout:\n${stdout.trim()}`);
-  const fsMatch = stdout.match(/File System Name\s*:\s*(\S+)/i);
-  const fsName = fsMatch ? fsMatch[1].toLowerCase() : 'unknown';
+
+  // Querying the system/boot volume's volumeinfo requires elevation and throws
+  // "Access is denied" for non-admin users. Catch that locally (like the diskfree
+  // and drivetype calls below) instead of letting it propagate to the outer catch
+  // in detectFilesystem() — that outer catch forces needsFormat:false, which would
+  // silently skip the format-safety UI entirely. Falling back to fsName 'unknown'
+  // here still correctly triggers needsFormat below, so the removable check still runs.
+  let fsName = 'unknown';
+  try {
+    const { stdout } = await execAsync(`fsutil fsinfo volumeinfo ${drive}: 2>&1`, {
+      windowsHide: true,
+    });
+    console.log(`[diag] fsutil volumeinfo ${drive}: stdout:\n${stdout.trim()}`);
+    const fsMatch = stdout.match(/File System Name\s*:\s*(\S+)/i);
+    fsName = fsMatch ? fsMatch[1].toLowerCase() : 'unknown';
+  } catch (e) {
+    console.log(`[diag] volumeinfo check failed: ${e.message}`);
+  }
 
   // Log drive size so we can tell if FAT32 format will be rejected (> 32 GB limit)
   try {
