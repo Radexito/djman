@@ -129,6 +129,26 @@ export function getLibraryDiskUsage(libraryId) {
   return getDirSize(getLibraryBase(libraryId)) + getDirSize(getArtworkBase(libraryId));
 }
 
+/**
+ * Free bytes remaining on the filesystem/partition backing a library.
+ * Walks up to the nearest existing ancestor directory since a brand-new
+ * library's folder may not be created on disk yet.
+ */
+export function getLibraryFreeSpace(libraryId) {
+  let dir = getLibraryBase(libraryId);
+  while (!fs.existsSync(dir)) {
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  try {
+    const stats = fs.statfsSync(dir);
+    return stats.bavail * stats.bsize;
+  } catch {
+    return null;
+  }
+}
+
 export function getStorageFormat(libraryId) {
   return getLibrary(libraryId)?.storage_format === 'readable' ? 'readable' : 'hashed';
 }

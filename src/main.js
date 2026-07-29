@@ -80,6 +80,7 @@ import {
   convertStorageFormat,
   moveTrackToLibrary,
   getLibraryDiskUsage,
+  getLibraryFreeSpace,
 } from './audio/importManager.js';
 import {
   listLibraries,
@@ -509,6 +510,13 @@ ipcMain.handle('list-libraries', () =>
 );
 ipcMain.handle('get-library-size', (_, libraryId) =>
   getLibraryDiskUsage(libraryId ?? getCurrentLibraryId())
+);
+ipcMain.handle('list-libraries-with-free-space', () =>
+  listLibraries().map((lib) => ({
+    ...lib,
+    effective_root_path: getLibraryBase(lib.id),
+    free_bytes: getLibraryFreeSpace(lib.id),
+  }))
 );
 ipcMain.handle('get-current-library-id', () => getCurrentLibraryId());
 ipcMain.handle('set-current-library-id', (_, id) => setCurrentLibraryId(id));
@@ -1918,6 +1926,28 @@ ipcMain.handle('move-track-to-library', async (_, { trackId, targetLibraryId }) 
   const result = await moveTrackToLibrary(trackId, targetLibraryId);
   send('library-updated');
   return result;
+});
+
+ipcMain.handle('move-tracks-to-library', async (_, { trackIds, targetLibraryId }) => {
+  const total = trackIds.length;
+  const moved = [];
+  const failed = [];
+
+  for (let i = 0; i < total; i++) {
+    const trackId = trackIds[i];
+    try {
+      const result = await moveTrackToLibrary(trackId, targetLibraryId);
+      moved.push({ trackId, newPath: result.newPath ?? null });
+    } catch (err) {
+      console.error('moveTrackToLibrary failed:', trackId, err);
+      failed.push(trackId);
+    }
+    send('move-tracks-to-library-progress', { completed: i + 1, total });
+  }
+
+  if (moved.length > 0) send('library-updated');
+  send('move-tracks-to-library-progress', { completed: total, total, done: true });
+  return { moved, failed };
 });
 
 ipcMain.handle('check-linked-track-status', (_, trackIds) => {

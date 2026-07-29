@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('api', {
   // Multiple libraries (#390) — all active at once, no switching/restart
   // except to relocate the database file itself (moveDatabase).
   listLibraries: () => ipcRenderer.invoke('list-libraries'),
+  listLibrariesWithFreeSpace: () => ipcRenderer.invoke('list-libraries-with-free-space'),
   getLibrarySize: (libraryId) => ipcRenderer.invoke('get-library-size', libraryId),
   getCurrentLibraryId: () => ipcRenderer.invoke('get-current-library-id'),
   setCurrentLibraryId: (id) => ipcRenderer.invoke('set-current-library-id', id),
@@ -264,6 +265,13 @@ contextBridge.exposeInMainWorld('api', {
   remapFolder: (oldDir) => ipcRenderer.invoke('remap-folder', { oldDir }),
   moveTrackToLibrary: (trackId, targetLibraryId) =>
     ipcRenderer.invoke('move-track-to-library', { trackId, targetLibraryId }),
+  moveTracksToLibrary: (trackIds, targetLibraryId) =>
+    ipcRenderer.invoke('move-tracks-to-library', { trackIds, targetLibraryId }),
+  onMoveTracksToLibraryProgress: (cb) => {
+    const handler = (_, data) => cb(data);
+    ipcRenderer.on('move-tracks-to-library-progress', handler);
+    return () => ipcRenderer.removeListener('move-tracks-to-library-progress', handler);
+  },
   checkLinkedTrackStatus: (trackIds) => ipcRenderer.invoke('check-linked-track-status', trackIds),
   getLinkedTracksBasic: () => ipcRenderer.invoke('get-linked-tracks-basic'),
 

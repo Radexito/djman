@@ -100,6 +100,7 @@ vi.mock('fs', () => {
     createReadStream: vi.fn().mockImplementation(makeStream),
     readdirSync: vi.fn().mockReturnValue([]),
     statSync: vi.fn().mockReturnValue({ size: 0 }),
+    statfsSync: vi.fn().mockReturnValue({ bavail: 0, bsize: 0 }),
   };
   return { default: fsMock, ...fsMock };
 });
@@ -145,6 +146,7 @@ import {
   moveTrackToLibrary,
   convertStorageFormat,
   getLibraryDiskUsage,
+  getLibraryFreeSpace,
 } from '../audio/importManager.js';
 import cryptoDefault from 'crypto';
 
@@ -696,5 +698,35 @@ describe('getLibraryDiskUsage', () => {
     });
 
     expect(getLibraryDiskUsage(1)).toBe(0);
+  });
+});
+
+describe('getLibraryFreeSpace', () => {
+  it('returns free bytes (bavail * bsize) for the library base directory', () => {
+    const audioBase = path.join('/tmp/djman-test', 'audio');
+    fs.existsSync.mockImplementation((p) => p === audioBase);
+    fs.statfsSync.mockReturnValue({ bavail: 1000, bsize: 4096 });
+
+    expect(getLibraryFreeSpace(1)).toBe(1000 * 4096);
+    expect(fs.statfsSync).toHaveBeenCalledWith(audioBase);
+  });
+
+  it('walks up to the nearest existing ancestor when the library folder does not exist yet', () => {
+    const audioBase = path.join('/tmp/djman-test', 'audio');
+    fs.existsSync.mockImplementation((p) => p === '/tmp/djman-test');
+    fs.statfsSync.mockReturnValue({ bavail: 500, bsize: 4096 });
+
+    expect(getLibraryFreeSpace(1)).toBe(500 * 4096);
+    expect(fs.statfsSync).toHaveBeenCalledWith('/tmp/djman-test');
+    expect(fs.statfsSync).not.toHaveBeenCalledWith(audioBase);
+  });
+
+  it('returns null when statfsSync throws (e.g. unmounted drive)', () => {
+    fs.existsSync.mockReturnValue(true);
+    fs.statfsSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+
+    expect(getLibraryFreeSpace(1)).toBeNull();
   });
 });

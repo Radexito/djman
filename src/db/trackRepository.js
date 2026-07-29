@@ -38,6 +38,8 @@ const ALLOWED_TRACK_COLUMNS = new Set([
   'source_platform',
   'source_quality',
   'source_link',
+  'library_id',
+  'is_linked',
 ]);
 
 // ─── Camelot helpers (mirrors renderer/src/searchParser.js) ─────────────────

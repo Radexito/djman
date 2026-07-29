@@ -37,6 +37,20 @@ const PRELOAD_TRIGGER = 3;
 // Stable fallback so tests/mocks that stub usePlayer() without this field don't crash.
 const EMPTY_SET = new Set();
 
+// MB and up — sub-megabyte sizes just round down to "0.0 MB" rather than
+// switching to bytes/KB. Mirrors SettingsModal.jsx's formatBytes.
+const SIZE_UNITS = ['MB', 'GB', 'TB'];
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  const mb = bytes / 1024 ** 2;
+  const exp = Math.max(
+    0,
+    Math.min(Math.floor(Math.log(mb) / Math.log(1024)), SIZE_UNITS.length - 1)
+  );
+  const value = mb / 1024 ** exp;
+  return `${value.toFixed(1)} ${SIZE_UNITS[exp]}`;
+}
+
 const LS_COL_KEY = 'djman_column_visibility';
 const LS_ORDER_KEY = 'djman_column_order';
 
@@ -550,6 +564,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
   const toastTimerRef = useRef(null);
   const [drillStack, setDrillStack] = useState([]); // overlay drill-down stack [{ id, label, content }]
   const [playlistSubmenu, setPlaylistSubmenu] = useState(null); // [{ id, name, color, is_member }]
+  const [librarySubmenu, setLibrarySubmenu] = useState(null); // [{ id, name, free_bytes }]
   const [newPlaylistInputActive, setNewPlaylistInputActive] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistError, setNewPlaylistError] = useState('');
@@ -1052,6 +1067,8 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
       // Fetch playlist membership for single track (representative for submenu)
       const playlists = await window.api.getPlaylistsForTrack(targetIds[0]);
       setPlaylistSubmenu(playlists);
+      const libraries = await window.api.listLibrariesWithFreeSpace();
+      setLibrarySubmenu(libraries);
 
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -1171,6 +1188,46 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
       console.error('addTracksToPlaylist failed:', err);
     }
   }, []);
+
+  const handleMoveToLibrary = useCallback(
+    async (targetLibraryId, targetIds) => {
+      setContextMenu(null);
+      if (!targetIds?.length) return;
+      const { moved, failed } = await window.api.moveTracksToLibrary(targetIds, targetLibraryId);
+      const patchById = new Map(
+        moved.map(({ trackId, newPath }) => [
+          trackId,
+          { library_id: targetLibraryId, is_linked: 0, ...(newPath ? { file_path: newPath } : {}) },
+        ])
+      );
+      if (patchById.size > 0) {
+        setTracks((prev) =>
+          prev.map((t) => (patchById.has(t.id) ? { ...t, ...patchById.get(t.id) } : t))
+        );
+        // Keep an already-open Edit Details panel in sync (same fix as the
+        // library-move/storage-format case above) — otherwise it keeps
+        // showing the track's old library after a move.
+        setDetailsTrack((prev) =>
+          prev && patchById.has(prev.id) ? { ...prev, ...patchById.get(prev.id) } : prev
+        );
+        setDetailsBulkTracks((prev) =>
+          prev
+            ? prev.map((t) => (patchById.has(t.id) ? { ...t, ...patchById.get(t.id) } : t))
+            : prev
+        );
+      }
+      const movedCount = moved.length;
+      const failedCount = failed.length;
+      if (failedCount === 0) {
+        showToast(`Moved ${movedCount} track${movedCount !== 1 ? 's' : ''} to library.`);
+      } else if (movedCount === 0) {
+        showToast(`Failed to move track${targetIds.length !== 1 ? 's' : ''}.`, false);
+      } else {
+        showToast(`Moved ${movedCount}, failed to move ${failedCount}.`, false);
+      }
+    },
+    [showToast]
+  );
 
   const handleAddToNewPlaylist = useCallback(
     async (e) => {
@@ -1721,6 +1778,33 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                           ))}
                         </SubItem>
                       ))}
+
+                    {/* ── Move to library ── */}
+                    {librarySubmenu !== null && librarySubmenu.length > 1 && (
+                      <SubItem id="move-to-library" label="📚 Move to library" wide>
+                        {librarySubmenu.map((lib) => {
+                          const isCurrent = contextMenu.track?.library_id === lib.id;
+                          return (
+                            <div
+                              key={lib.id}
+                              className={`context-menu-item context-menu-item--library${isCurrent ? ' context-menu-item--checked' : ''}`}
+                              onClick={() =>
+                                !isCurrent &&
+                                handleMoveToLibrary(lib.id, contextMenu?.targetIds ?? [])
+                              }
+                            >
+                              <span>
+                                {isCurrent ? '✓ ' : ''}
+                                {lib.name}
+                              </span>
+                              <span className="ctx-library-free">
+                                {formatBytes(lib.free_bytes)} free
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </SubItem>
+                    )}
 
                     {/* ── Find similar ── */}
                     {contextMenu.targetTracks?.length > 0 && (
