@@ -1942,11 +1942,11 @@ ipcMain.handle('move-tracks-to-library', async (_, { trackIds, targetLibraryId }
       console.error('moveTrackToLibrary failed:', trackId, err);
       failed.push(trackId);
     }
-    send('move-library-progress', { completed: i + 1, total });
+    send('move-tracks-to-library-progress', { completed: i + 1, total });
   }
 
   if (moved.length > 0) send('library-updated');
-  send('move-library-progress', { completed: total, total, done: true });
+  send('move-tracks-to-library-progress', { completed: total, total, done: true });
   return { moved, failed };
 });
 

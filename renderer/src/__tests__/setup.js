@@ -136,7 +136,7 @@ window.api = {
   remapFolder: vi.fn().mockResolvedValue({ ok: true, count: 0 }),
   moveTrackToLibrary: vi.fn().mockResolvedValue({ ok: true, moved: true }),
   moveTracksToLibrary: vi.fn().mockResolvedValue({ moved: [], failed: [] }),
-  onMoveLibraryProgress: vi.fn().mockImplementation(noop),
+  onMoveTracksToLibraryProgress: vi.fn().mockImplementation(noop),
   checkLinkedTrackStatus: vi.fn().mockResolvedValue([]),
   getLinkedTracksBasic: vi.fn().mockResolvedValue([]),
   checkUsbFormat: vi
