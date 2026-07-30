@@ -10,7 +10,6 @@ const MENU_ITEMS = [
   { id: 'cloud-search', name: 'Cloud Search', icon: '🔎' },
   { id: 'download', name: 'YT-DLP', icon: '⬇️' },
   { id: 'tidal', name: 'TIDAL', icon: '🌊' },
-  { id: 'help', name: 'Help', icon: '❓' },
 ];
 
 const PRESET_COLORS = [

@@ -113,6 +113,7 @@ function App() {
             <TopBar
               search={search}
               onSearchChange={setSearch}
+              onOpenHelp={() => setSelectedPlaylistId('help')}
               onOpenSettings={() => setShowSettings(true)}
             />
             <div className="app-main">

@@ -2,7 +2,7 @@ import SearchBar from './SearchBar.jsx';
 import logo from './assets/logo.png';
 import './TopBar.css';
 
-export default function TopBar({ search, onSearchChange, onOpenSettings }) {
+export default function TopBar({ search, onSearchChange, onOpenHelp, onOpenSettings }) {
   return (
     <div className="top-bar">
       <div className="top-bar__logo">
@@ -14,7 +14,22 @@ export default function TopBar({ search, onSearchChange, onOpenSettings }) {
       </div>
 
       <div className="top-bar__actions">
-        <button className="top-bar__settings-btn" onClick={onOpenSettings} title="Settings">
+        <button
+          type="button"
+          className="top-bar__link-btn"
+          onClick={onOpenHelp}
+          title="Help"
+          aria-label="Help"
+        >
+          Help
+        </button>
+        <button
+          type="button"
+          className="top-bar__settings-btn"
+          onClick={onOpenSettings}
+          title="Settings"
+          aria-label="Settings"
+        >
           ⚙
         </button>
       </div>
