@@ -174,6 +174,52 @@ describe('TrackDetails — single mode', () => {
     );
     expect(onSave).toHaveBeenCalledTimes(1);
   });
+
+  it('refreshes the track list thumbnail after auto-tag applies a cover', async () => {
+    window.api.autoTagSearch.mockResolvedValueOnce({
+      ok: true,
+      results: [
+        {
+          source: 'Deezer',
+          title: 'Test Track',
+          artist: 'Test Artist',
+          album: 'Test Album',
+          label: '',
+          year: '2022',
+          genres: [],
+          coverUrl: 'https://example.com/cover.jpg',
+        },
+      ],
+    });
+    window.api.fetchArtworkUrl.mockResolvedValueOnce({
+      ok: true,
+      artwork_path: '/tmp/new-cover.jpg',
+    });
+
+    render(
+      <TrackDetails
+        track={SAMPLE_TRACK}
+        onSave={onSave}
+        onCancel={onCancel}
+        onPrev={onPrev}
+        onNext={onNext}
+        hasPrev={false}
+        hasNext={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('🔍 Auto-tag'));
+    fireEvent.click(screen.getByText('Search'));
+    await waitFor(() => screen.getByText(/result/));
+
+    fireEvent.click(screen.getByText('Apply'));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, artwork_path: '/tmp/new-cover.jpg', has_artwork: 1 })
+      )
+    );
+  });
 });
 
 describe('TrackDetails — bulk mode', () => {

@@ -479,7 +479,12 @@ export default function TrackDetails({
                 trackId: track.id,
                 url: update.coverUrl,
               });
-              if (res.ok) setArtworkPath(res.artwork_path);
+              if (res.ok) {
+                setArtworkPath(res.artwork_path);
+                // Push the new artwork into MusicLibrary's track state so the
+                // list thumbnail refreshes without waiting for handleSave/reload.
+                onSave({ ...track, artwork_path: res.artwork_path, has_artwork: 1 });
+              }
             }
           }}
         />

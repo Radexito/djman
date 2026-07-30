@@ -152,6 +152,8 @@ window.api = {
   onExportRekordboxProgress: vi.fn().mockImplementation(noop),
   onExportAllProgress: vi.fn().mockImplementation(noop),
   onFormatUsbProgress: vi.fn().mockImplementation(noop),
+  autoTagSearch: vi.fn().mockResolvedValue({ ok: true, results: [] }),
+  fetchArtworkUrl: vi.fn().mockResolvedValue({ ok: true, artwork_path: '/tmp/artwork.jpg' }),
 };
 
 // jsdom does not implement Web Audio API — stub the minimum PlayerContext needs
