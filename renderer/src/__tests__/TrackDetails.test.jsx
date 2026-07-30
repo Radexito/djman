@@ -220,6 +220,54 @@ describe('TrackDetails — single mode', () => {
       )
     );
   });
+
+  it('applying an auto-tag result saves directly to the DB without a separate Save step', async () => {
+    window.api.autoTagSearch.mockResolvedValueOnce({
+      ok: true,
+      results: [
+        {
+          source: 'Deezer',
+          title: 'Test Track',
+          artist: 'New Artist',
+          album: 'New Album',
+          label: '',
+          year: '2023',
+          genres: ['House'],
+          coverUrl: '',
+        },
+      ],
+    });
+
+    render(
+      <TrackDetails
+        track={SAMPLE_TRACK}
+        onSave={onSave}
+        onCancel={onCancel}
+        onPrev={onPrev}
+        onNext={onNext}
+        hasPrev={false}
+        hasNext={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('🔍 Auto-tag'));
+    fireEvent.click(screen.getByText('Search'));
+    await waitFor(() => screen.getByText(/result/));
+
+    fireEvent.click(screen.getByText('Apply'));
+
+    await waitFor(() =>
+      expect(window.api.updateTrack).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ artist: 'New Artist', album: 'New Album' })
+      )
+    );
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1, artist: 'New Artist', album: 'New Album' })
+    );
+    // Nothing left to confirm — Save stays disabled since there's no unsaved local change.
+    expect(screen.getByText('Save')).toBeDisabled();
+  });
 });
 
 describe('TrackDetails — bulk mode', () => {

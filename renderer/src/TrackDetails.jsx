@@ -456,35 +456,59 @@ export default function TrackDetails({
           track={track}
           onClose={() => setShowAutoTagger(false)}
           onApply={async (update) => {
-            // Merge result into form fields (convert genres array → comma string)
-            const merged = { ...form };
-            if (update.title != null) merged.title = update.title;
-            if (update.artist != null) merged.artist = update.artist;
-            if (update.album != null) merged.album = update.album;
-            if (update.label != null) merged.label = update.label;
-            if (update.year != null) merged.year = String(update.year);
-            if (update.genres != null) {
-              try {
-                merged.genres = JSON.parse(update.genres).join(', ');
-              } catch {
-                merged.genres = update.genres;
-              }
-            }
-            setForm(merged);
-            setDirty(true);
             setShowAutoTagger(false);
-            // Download and save cover art if selected
-            if (update.coverUrl && track?.id) {
-              const res = await window.api.fetchArtworkUrl({
-                trackId: track.id,
-                url: update.coverUrl,
-              });
-              if (res.ok) {
-                setArtworkPath(res.artwork_path);
-                // Push the new artwork into MusicLibrary's track state so the
-                // list thumbnail refreshes without waiting for handleSave/reload.
-                onSave({ ...track, artwork_path: res.artwork_path, has_artwork: 1 });
+            setSaving(true);
+            setError(null);
+            try {
+              // Auto-tag applies straight to the DB — no separate Save step needed.
+              const data = {};
+              if (update.title != null) data.title = update.title;
+              if (update.artist != null) data.artist = update.artist;
+              if (update.album != null) data.album = update.album;
+              if (update.label != null) data.label = update.label;
+              if (update.year != null) data.year = update.year;
+              if (update.genres != null) data.genres = update.genres;
+
+              if (Object.keys(data).length > 0) {
+                await window.api.updateTrack(track.id, data);
+                onSave({ ...track, ...data });
               }
+
+              // Merge result into form fields (convert genres array → comma string)
+              const merged = { ...form };
+              if (update.title != null) merged.title = update.title;
+              if (update.artist != null) merged.artist = update.artist;
+              if (update.album != null) merged.album = update.album;
+              if (update.label != null) merged.label = update.label;
+              if (update.year != null) merged.year = String(update.year);
+              if (update.genres != null) {
+                try {
+                  merged.genres = JSON.parse(update.genres).join(', ');
+                } catch {
+                  merged.genres = update.genres;
+                }
+              }
+              setForm(merged);
+
+              // Download and save cover art if selected
+              if (update.coverUrl && track?.id) {
+                const res = await window.api.fetchArtworkUrl({
+                  trackId: track.id,
+                  url: update.coverUrl,
+                });
+                if (res.ok) {
+                  setArtworkPath(res.artwork_path);
+                  // Push the new artwork into MusicLibrary's track state so the
+                  // list thumbnail refreshes without waiting for a reload.
+                  onSave({ ...track, ...data, artwork_path: res.artwork_path, has_artwork: 1 });
+                } else {
+                  setError(`Failed to download cover art: ${res.error ?? 'unknown error'}`);
+                }
+              }
+            } catch (e) {
+              setError(e.message ?? 'Auto-tag apply failed');
+            } finally {
+              setSaving(false);
             }
           }}
         />
