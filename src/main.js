@@ -60,6 +60,8 @@ import {
   getLinkedTracksBasic,
   remapTracksByPrefix,
   removeTrack,
+  removeTracks,
+  getTrackCountByFilePath,
   updateTrack,
   resetNormalization,
   clearTracksForLibrary,
@@ -647,9 +649,44 @@ ipcMain.handle('cancel-analysis', (_, trackId) => {
   return { cancelled };
 });
 ipcMain.handle('remove-track', (_, trackId) => {
+  const track = getTrackById(trackId);
   removeTrack(trackId); // ON DELETE CASCADE removes playlist_tracks rows
+  // Imported tracks own their copy in userData/audio — delete it too, unless another
+  // track row still references the same path (SHA-1 import dedup isn't transactional,
+  // so two rows can share one file_path).
+  if (track && !track.is_linked && track.file_path) {
+    if (getTrackCountByFilePath(track.file_path) === 0) {
+      try {
+        fs.unlinkSync(track.file_path);
+      } catch {
+        /* already gone */
+      }
+    }
+  }
   if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
   return { ok: true };
+});
+ipcMain.handle('remove-tracks', (_, trackIds) => {
+  const total = trackIds.length;
+  const tracks = trackIds.map((id) => getTrackById(id)).filter(Boolean);
+
+  removeTracks(trackIds); // single transaction — ON DELETE CASCADE removes playlist_tracks rows
+
+  for (let i = 0; i < tracks.length; i++) {
+    const track = tracks[i];
+    if (!track.is_linked && track.file_path && getTrackCountByFilePath(track.file_path) === 0) {
+      try {
+        fs.unlinkSync(track.file_path);
+      } catch {
+        /* already gone */
+      }
+    }
+    send('remove-tracks-progress', { completed: i + 1, total });
+  }
+
+  if (global.mainWindow) global.mainWindow.webContents.send('playlists-updated');
+  send('remove-tracks-progress', { completed: total, total, done: true });
+  return { ok: true, total };
 });
 ipcMain.handle('remove-linked-file', async (_, trackId) => {
   const track = getTrackById(trackId);

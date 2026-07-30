@@ -62,6 +62,8 @@ window.api = {
   getZoomFactor: vi.fn().mockReturnValue(1.0),
   setZoomFactor: vi.fn(),
   removeTrack: vi.fn().mockResolvedValue({ ok: true }),
+  removeTracks: vi.fn().mockResolvedValue({ ok: true, total: 0 }),
+  onRemoveTracksProgress: vi.fn().mockImplementation(noop),
   removeLinkedFile: vi.fn().mockResolvedValue({ ok: true }),
   adjustBpm: vi.fn().mockResolvedValue([]),
   updateTrack: vi.fn().mockResolvedValue({}),

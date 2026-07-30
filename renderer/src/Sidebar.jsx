@@ -37,6 +37,7 @@ function Sidebar({
   const [analysisProgress, setAnalysisProgress] = useState(null); // { done, total } | null
   const [waveformGenProgress, setWaveformGenProgress] = useState(null); // { completed, total } | null
   const [moveTracksProgress, setMoveTracksProgress] = useState(null); // { completed, total } | null
+  const [removeTracksProgress, setRemoveTracksProgress] = useState(null); // { completed, total } | null
   const [exportProgress, setExportProgress] = useState(null); // { copied, total, pct } | null
   const [ytDlpCheckProgress, setYtDlpCheckProgress] = useState(null); // { checked, total } | null during fetch/check
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -206,6 +207,18 @@ function Sidebar({
         setTimeout(() => setMoveTracksProgress(null), 1500);
       } else {
         setMoveTracksProgress({ completed: data.completed, total: data.total });
+      }
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!window.api.onRemoveTracksProgress) return;
+    const unsub = window.api.onRemoveTracksProgress((data) => {
+      if (data.done) {
+        setTimeout(() => setRemoveTracksProgress(null), 1500);
+      } else {
+        setRemoveTracksProgress({ completed: data.completed, total: data.total });
       }
     });
     return unsub;
@@ -456,6 +469,24 @@ function Sidebar({
                 className="normalize-progress-fill"
                 style={{
                   width: `${moveTracksProgress.total > 0 ? Math.round((moveTracksProgress.completed / moveTracksProgress.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {removeTracksProgress && (
+          <div className="normalize-progress-wrap">
+            <div className="normalize-progress-label">
+              <span>Removing tracks</span>
+              <span>
+                {removeTracksProgress.completed} / {removeTracksProgress.total}
+              </span>
+            </div>
+            <div className="normalize-progress-bar">
+              <div
+                className="normalize-progress-fill"
+                style={{
+                  width: `${removeTracksProgress.total > 0 ? Math.round((removeTracksProgress.completed / removeTracksProgress.total) * 100) : 0}%`,
                 }}
               />
             </div>

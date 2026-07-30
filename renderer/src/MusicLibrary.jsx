@@ -1156,12 +1156,12 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
     const n = targetIds.length;
     const msg =
       n === 1
-        ? 'Remove this track from your library? This cannot be undone.'
-        : `Remove ${n} tracks from your library? This cannot be undone.`;
+        ? 'Remove this track from your library? Imported tracks also have their audio file deleted from disk. This cannot be undone.'
+        : `Remove ${n} tracks from your library? Imported tracks also have their audio files deleted from disk. This cannot be undone.`;
     if (!window.confirm(msg)) return;
     if (currentTrack && targetIds.includes(currentTrack.id)) stop();
     setContextMenu(null);
-    for (const id of targetIds) await window.api.removeTrack(id);
+    await window.api.removeTracks(targetIds);
     setTracks((prev) => prev.filter((t) => !targetIds.includes(t.id)));
     setSelectedIds(new Set());
     offsetRef.current = Math.max(0, offsetRef.current - targetIds.length);
