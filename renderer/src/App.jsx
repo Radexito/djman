@@ -26,6 +26,7 @@ function App() {
   const zoomHideTimer = useRef(null);
   const ZOOM_HIDE_DELAY = 3000;
   const [search, setSearch] = useState('');
+  const [openDetailsRequest, setOpenDetailsRequest] = useState(null);
 
   const handleArtistSearch = (artist) => {
     setSelectedPlaylistId('music');
@@ -35,6 +36,12 @@ function App() {
   const handleLogoClick = () => {
     setSelectedPlaylistId('music');
     setSearch('');
+  };
+
+  const handlePlayerOpenDetails = (trackId, playlistId) => {
+    if (!trackId) return;
+    setSelectedPlaylistId(playlistId != null ? String(playlistId) : 'music');
+    setOpenDetailsRequest({ trackId, nonce: Date.now() });
   };
 
   const handleMenuSelect = (id) => {
@@ -157,6 +164,7 @@ function App() {
                     selectedPlaylist={selectedPlaylistId}
                     search={search}
                     onSearchChange={setSearch}
+                    openDetailsRequest={openDetailsRequest}
                   />
                 )}
             </div>
@@ -164,6 +172,7 @@ function App() {
           <PlayerBar
             onNavigateToPlaylist={setSelectedPlaylistId}
             onArtistSearch={handleArtistSearch}
+            onOpenTrackDetails={handlePlayerOpenDetails}
           />
           {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
           {exportState != null && (

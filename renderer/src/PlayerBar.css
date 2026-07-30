@@ -35,11 +35,18 @@
 
 /* ── Left ─────────────────────────────── */
 .player-left {
-  flex: 0 0 220px;
+  flex: 0 0 310px;
   display: flex;
   align-items: center;
   gap: 10px;
   overflow: hidden;
+}
+
+.player-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  flex: 0 0 86px;
 }
 
 .player-art {
@@ -49,6 +56,24 @@
   object-fit: cover;
   flex-shrink: 0;
   background: #2a2a2a;
+}
+
+.player-art-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.player-art-btn--enabled {
+  cursor: pointer;
+}
+
+.player-art-btn--enabled:hover .player-art,
+.player-art-btn--enabled:focus-visible .player-art {
+  outline: 1px solid #3d3d3d;
+  outline-offset: 2px;
 }
 
 .player-art--placeholder {
@@ -142,6 +167,14 @@
 
 .player-btn--active {
   color: #1db954;
+}
+
+.player-btn--play {
+  font-size: 18px;
+}
+
+.player-btn--toggle {
+  color: #666;
 }
 
 /* ── Seekbar / waveform — spans the full width freed up by the ────

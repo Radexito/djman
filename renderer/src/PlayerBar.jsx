@@ -11,13 +11,15 @@ function formatTime(s) {
   return `${m}:${sec}`;
 }
 
-export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
+export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch, onOpenTrackDetails }) {
   const {
     mediaPort,
     currentTrack,
     currentPlaylistId,
     currentPlaylistName,
     isPlaying,
+    shuffle,
+    repeat,
     currentTime,
     duration,
     outputDeviceId,
@@ -25,7 +27,12 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     history,
     playbackError,
     clearPlaybackError,
+    togglePlay,
+    next,
+    prev,
     seek,
+    toggleShuffle,
+    cycleRepeat,
     setDevice,
     setVolume,
     play,
@@ -141,6 +148,7 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     const W = canvas.width;
     const H = canvas.height;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     ctx.clearRect(0, 0, W, H);
     if (!data || data.length < 4) return;
 
@@ -302,13 +310,13 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     const canvas = waveCanvasRef.current;
     if (!currentTrack) {
       waveDataRef.current = null;
-      if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
     window.api.getTrackWaveform(currentTrack.id).then((raw) => {
       waveDataRef.current = raw ? new Uint8Array(raw) : null;
       if (!waveDataRef.current && canvas) {
-        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
       } else {
         paintWaveform();
       }
@@ -346,11 +354,51 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
       )}
       {/* Left: album art + current track info */}
       <div className="player-left">
-        {artSrc ? (
-          <img className="player-art" src={artSrc} alt="Album art" draggable={false} />
-        ) : (
-          <div className="player-art player-art--placeholder">♪</div>
-        )}
+        <div className="player-controls-grid" aria-label="Playback controls">
+          <button
+            type="button"
+            className={`player-btn player-btn--toggle${shuffle ? ' player-btn--active' : ''}`}
+            onClick={toggleShuffle}
+            title="Shuffle"
+          >
+            ⇄
+          </button>
+          <button type="button" className="player-btn" onClick={prev} title="Previous">
+            ⏮
+          </button>
+          <button type="button" className="player-btn" onClick={next} title="Next">
+            ⏭
+          </button>
+          <button
+            type="button"
+            className={`player-btn player-btn--toggle${repeat !== 'none' ? ' player-btn--active' : ''}`}
+            onClick={cycleRepeat}
+            title={`Repeat: ${repeat}`}
+          >
+            {repeat === 'one' ? '↺¹' : '↺'}
+          </button>
+          <button
+            type="button"
+            className="player-btn player-btn--play"
+            onClick={togglePlay}
+            title="Play / Pause"
+          >
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+        </div>
+        <button
+          type="button"
+          className={`player-art-btn${currentTrack ? ' player-art-btn--enabled' : ''}`}
+          onClick={() => currentTrack && onOpenTrackDetails?.(currentTrack.id, currentPlaylistId)}
+          title={currentTrack ? 'Open track details' : undefined}
+          disabled={!currentTrack}
+        >
+          {artSrc ? (
+            <img className="player-art" src={artSrc} alt="Album art" draggable={false} />
+          ) : (
+            <div className="player-art player-art--placeholder">♪</div>
+          )}
+        </button>
         <div className="player-track-info">
           {currentTrack ? (
             <>

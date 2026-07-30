@@ -26,57 +26,10 @@
   object-fit: contain;
 }
 
-/* ── Transport controls ── */
-.top-bar__controls {
+/* ── Spacer ── */
+.top-bar__spacer {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.top-bar__btn {
-  background: none;
-  border: none;
-  color: #ccc;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
-  line-height: 1;
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-
-.top-bar__btn:hover {
-  color: #fff;
-  background: #2a2a2a;
-}
-
-.top-bar__btn:disabled {
-  color: #444;
-  cursor: default;
-  background: none;
-}
-
-.top-bar__btn--play {
-  font-size: 17px;
-  padding: 4px 8px;
-}
-
-.top-bar__btn--active {
-  color: #1db954;
-}
-
-.top-bar__btn--toggle {
-  color: #555;
-  font-size: 15px;
-}
-
-.top-bar__btn--toggle.top-bar__btn--active {
-  color: #1db954;
 }
 
 /* ── Actions ── */
