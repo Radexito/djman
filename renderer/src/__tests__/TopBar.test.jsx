@@ -6,12 +6,7 @@ describe('TopBar', () => {
   it('calls onOpenHelp when Help is clicked', () => {
     const onOpenHelp = vi.fn();
     render(
-      <TopBar
-        search=""
-        onSearchChange={vi.fn()}
-        onOpenHelp={onOpenHelp}
-        onOpenSettings={vi.fn()}
-      />
+      <TopBar search="" onSearchChange={vi.fn()} onOpenHelp={onOpenHelp} onOpenSettings={vi.fn()} />
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Help' }));
