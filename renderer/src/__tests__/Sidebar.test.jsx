@@ -59,6 +59,11 @@ describe('Sidebar', () => {
     expect(onMenuSelect).toHaveBeenCalledWith('music');
   });
 
+  it('gives the Import button a title, like the Link button', () => {
+    renderSidebar({ ...defaultProps });
+    expect(screen.getByText('Import')).toHaveAttribute('title');
+  });
+
   it('calls onMenuSelect with playlist id when playlist is clicked', async () => {
     const onMenuSelect = vi.fn();
     window.api.getPlaylists.mockResolvedValueOnce([
