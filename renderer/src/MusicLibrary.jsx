@@ -4,6 +4,7 @@ import {
   useRef,
   useCallback,
   useMemo,
+  useTransition,
   createContext,
   useContext,
 } from 'react';
@@ -640,6 +641,12 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
   }, [visibleColumns]);
 
   const [sortBy, setSortBy] = useState({ key: 'index', asc: true });
+  // Sorting large libraries client-side can take long enough to block a paint.
+  // useTransition lets the click handler return immediately (React stays responsive
+  // and can render a pending indicator) while the expensive re-sort + re-render
+  // happens at low priority in the background.
+  const [isSorting, startSortTransition] = useTransition();
+  const [pendingSortKey, setPendingSortKey] = useState(null);
 
   const loadTracks = useCallback(async () => {
     if (loadingRef.current || !hasMoreRef.current) return;
@@ -1394,10 +1401,15 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
 
   const handleSort = useCallback(
     (key) => {
-      setSortBy((prev) => {
-        const next = { key, asc: prev.key === key ? !prev.asc : true };
-        if (isPlaylistView) setSortSaved(next.key === 'index');
-        return next;
+      // Set synchronously (high priority) so the clicked header can show a pending
+      // indicator immediately, even while the actual re-sort is deferred below.
+      setPendingSortKey(key);
+      startSortTransition(() => {
+        setSortBy((prev) => {
+          const next = { key, asc: prev.key === key ? !prev.asc : true };
+          if (isPlaylistView) setSortSaved(next.key === 'index');
+          return next;
+        });
       });
     },
     [isPlaylistView]
@@ -1471,7 +1483,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                 {visibleColumns.map((col) => (
                   <div
                     key={col.key}
-                    className={`header-cell ${['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate'].includes(col.key) ? 'right' : ''}`}
+                    className={`header-cell ${['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate'].includes(col.key) ? 'right' : ''} ${isSorting && pendingSortKey === col.key ? 'header-cell--sorting' : ''}`}
                     onClick={() => handleSort(col.key)}
                   >
                     {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
@@ -1493,7 +1505,7 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
                 {visibleColumns.map((col) => (
                   <div
                     key={col.key}
-                    className={`header-cell ${['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate'].includes(col.key) ? 'right' : ''}`}
+                    className={`header-cell ${['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate'].includes(col.key) ? 'right' : ''} ${isSorting && pendingSortKey === col.key ? 'header-cell--sorting' : ''}`}
                     onClick={() => handleSort(col.key)}
                   >
                     {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}

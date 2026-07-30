@@ -48,6 +48,10 @@
   text-align: right;
 }
 
+.header-cell--sorting {
+  opacity: 0.6;
+}
+
 /* Rows */
 .row {
   height: 50px;
