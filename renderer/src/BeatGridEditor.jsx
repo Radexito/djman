@@ -16,8 +16,7 @@ function getDetailMsPerCol(detail, trackDurationMs) {
   if (!detail || detail.length < 3) return null;
   const numCols = Math.floor(detail.length / 3);
   if (numCols <= 0) return null;
-  const totalMs =
-    trackDurationMs > 0 ? trackDurationMs : (numCols / FALLBACK_COLS_PER_SEC) * 1000;
+  const totalMs = trackDurationMs > 0 ? trackDurationMs : (numCols / FALLBACK_COLS_PER_SEC) * 1000;
   return totalMs / numCols;
 }
 
