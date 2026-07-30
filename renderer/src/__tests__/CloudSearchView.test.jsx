@@ -4,9 +4,20 @@ import CloudSearchView from '../CloudSearchView.jsx';
 
 class MockAudio {
   constructor() {
-    this.src = '';
+    this._src = '';
+    this.currentSrc = '';
     this.paused = true;
     this.listeners = {};
+  }
+  set src(value) {
+    this._src = value;
+    this.currentSrc = value;
+    if (!value && MockAudio.emitErrorOnEmptySrc) {
+      this.listeners.error?.();
+    }
+  }
+  get src() {
+    return this._src;
   }
   addEventListener(event, cb) {
     this.listeners[event] = cb;
@@ -30,6 +41,7 @@ describe('CloudSearchView previews', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.Audio = MockAudio;
+    MockAudio.emitErrorOnEmptySrc = false;
     window.api.cloudSearch.mockResolvedValue({
       ok: true,
       results: [
@@ -79,5 +91,14 @@ describe('CloudSearchView previews', () => {
         url: 'https://youtube.com/watch?v=abc123',
       });
     });
+  });
+
+  it('does not show a preview error when search reset clears an empty audio source', async () => {
+    MockAudio.emitErrorOnEmptySrc = true;
+
+    await renderAndSearch();
+
+    expect(screen.queryByText('Inline preview playback failed')).toBeNull();
+    expect(screen.getByText('Preview Me')).toBeInTheDocument();
   });
 });

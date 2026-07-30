@@ -132,6 +132,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
   const searchSeq = useRef(0);
   const audioRef = useRef(null);
   const previewUrlCache = useRef(new Map());
+  const suppressPreviewError = useRef(false);
 
   useEffect(() => {
     window.api.tidalCheck?.().then(setTidalSetup);
@@ -147,8 +148,15 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
 
     const handleEnded = () => setPreviewPlaying(false);
     const handlePause = () => setPreviewPlaying(false);
-    const handlePlay = () => setPreviewPlaying(true);
+    const handlePlay = () => {
+      suppressPreviewError.current = false;
+      setPreviewPlaying(true);
+    };
     const handleError = () => {
+      if (suppressPreviewError.current || !(audio.currentSrc || audio.src)) {
+        suppressPreviewError.current = false;
+        return;
+      }
       setPreviewError('Inline preview playback failed');
       setPreviewPlaying(false);
       setPreviewTrackKey(null);
@@ -160,6 +168,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     audio.addEventListener('error', handleError);
 
     return () => {
+      suppressPreviewError.current = true;
       audio.pause();
       audio.src = '';
       audio.removeEventListener('ended', handleEnded);
@@ -185,6 +194,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     setPreviewPlaying(false);
     previewUrlCache.current.clear();
     if (audioRef.current) {
+      suppressPreviewError.current = true;
       audioRef.current.pause();
       audioRef.current.src = '';
     }
@@ -258,6 +268,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
           audio.pause();
         } else {
           try {
+            suppressPreviewError.current = false;
             await audio.play();
             setPreviewPlaying(true);
           } catch (err) {
@@ -281,12 +292,15 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
           previewUrlCache.current.set(key, previewUrl);
         }
 
+        suppressPreviewError.current = true;
         audio.pause();
         audio.src = previewUrl;
         setPreviewTrackKey(key);
+        suppressPreviewError.current = false;
         await audio.play();
         setPreviewPlaying(true);
       } catch (err) {
+        suppressPreviewError.current = false;
         setPreviewError(err.message ?? 'Inline preview playback failed');
         setPreviewTrackKey(null);
         setPreviewPlaying(false);
