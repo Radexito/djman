@@ -35,6 +35,7 @@ import './MusicLibrary.css';
 const PAGE_SIZE = 50;
 const ROW_HEIGHT = 50;
 const PRELOAD_TRIGGER = 3;
+const RIGHT_ALIGNED_COLUMNS = new Set(['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate']);
 // Stable fallback so tests/mocks that stub usePlayer() without this field don't crash.
 const EMPTY_SET = new Set();
 
@@ -479,6 +480,159 @@ function SortableColItem({ colKey, label, checked, onToggle }) {
       <input type="checkbox" checked={checked} onChange={onToggle} />
       <span className="col-dropdown__label">{label}</span>
     </div>
+  );
+}
+
+function TrackTableHeader({
+  headerScrollRef,
+  headerRef,
+  gridTemplate,
+  minScrollWidth,
+  visibleColumns,
+  isSorting,
+  pendingSortKey,
+  handleSort,
+  sortBy,
+  onContextMenu,
+}) {
+  return (
+    <div ref={headerScrollRef} style={{ overflow: 'hidden' }}>
+      <div
+        ref={headerRef}
+        className="header"
+        style={{ gridTemplateColumns: gridTemplate, minWidth: minScrollWidth }}
+        onContextMenu={onContextMenu}
+      >
+        {visibleColumns.map((col) => (
+          <div
+            key={col.key}
+            className={`header-cell ${RIGHT_ALIGNED_COLUMNS.has(col.key) ? 'right' : ''} ${isSorting && pendingSortKey === col.key ? 'header-cell--sorting' : ''}`}
+            onClick={() => handleSort(col.key)}
+          >
+            {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrackTableBody({
+  isPlaylistView,
+  tracks,
+  sortedTracks,
+  hasMore,
+  gridTemplate,
+  minScrollWidth,
+  dndScrollRef,
+  listRef,
+  handleItemsRendered,
+  selectedIds,
+  playingTrackId,
+  handleRowClick,
+  handleDoubleClick,
+  handleContextMenu,
+  handleRatingChange,
+  handleCueClick,
+  handleTrackDragStart,
+  visibleColumns,
+  mediaPort,
+  newTrackIds,
+  handleRowAnimationEnd,
+  unavailableLinkedIds,
+  sensors,
+  handleDragStart,
+  handleDragEnd,
+  activeTrack,
+}) {
+  if (isPlaylistView) {
+    if (tracks.length === 0) {
+      return (
+        <div className="playlist-empty-state">
+          No tracks in this playlist.
+          <br />
+          Drag tracks from your library here, or right-click to add.
+        </div>
+      );
+    }
+
+    return (
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={sortedTracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          <div ref={dndScrollRef} className="playlist-dnd-list">
+            {sortedTracks.map((t, index) => (
+              <SortableRow
+                key={t.id}
+                t={t}
+                index={index}
+                isSelected={selectedIds.has(t.id)}
+                isPlaying={playingTrackId === t.id}
+                onRowClick={handleRowClick}
+                onDoubleClick={handleDoubleClick}
+                onContextMenu={handleContextMenu}
+                onRatingChange={handleRatingChange}
+                onCueClick={handleCueClick}
+                onDragStart={handleTrackDragStart}
+                visibleColumns={visibleColumns}
+                gridTemplate={gridTemplate}
+                minScrollWidth={minScrollWidth}
+                mediaPort={mediaPort}
+                isNew={newTrackIds.has(t.id)}
+                onAnimationEnd={handleRowAnimationEnd}
+                isUnavailable={t.is_linked && unavailableLinkedIds.has(t.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+        <DragOverlay>
+          {activeTrack && (
+            <div className="row row-drag-overlay" style={{ gridTemplateColumns: gridTemplate }}>
+              <div className="cell index">⠿</div>
+              <div className="cell title">{activeTrack.title}</div>
+              <div className="cell artist">{activeTrack.artist || 'Unknown'}</div>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+    );
+  }
+
+  return (
+    <List
+      key={gridTemplate}
+      listRef={listRef}
+      defaultHeight={600}
+      rowCount={sortedTracks.length + (hasMore ? 1 : 0)}
+      rowHeight={ROW_HEIGHT}
+      width="100%"
+      style={{}}
+      onRowsRendered={handleItemsRendered}
+      className="track-list"
+      rowComponent={LibraryRow}
+      rowProps={{
+        tracks: sortedTracks,
+        selectedIds,
+        currentTrackId: playingTrackId,
+        onRowClick: handleRowClick,
+        onDoubleClick: handleDoubleClick,
+        onContextMenu: handleContextMenu,
+        onRatingChange: handleRatingChange,
+        onCueClick: handleCueClick,
+        onDragStart: handleTrackDragStart,
+        visibleColumns,
+        gridTemplate,
+        minScrollWidth,
+        mediaPort,
+        newTrackIds,
+        onAnimationEnd: handleRowAnimationEnd,
+        unavailableLinkedIds,
+      }}
+    />
   );
 }
 
@@ -1377,51 +1531,21 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
         )}
 
         <div className="table-scroll-wrap library-mode">
-          {isPlaylistView ? (
-            <div ref={headerScrollRef} style={{ overflow: 'hidden' }}>
-              <div
-                ref={headerRef}
-                className="header"
-                style={{ gridTemplateColumns: gridTemplate, minWidth: minScrollWidth }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setColMenuAnchor({ x: e.clientX, y: e.clientY });
-                }}
-              >
-                {visibleColumns.map((col) => (
-                  <div
-                    key={col.key}
-                    className={`header-cell ${['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate'].includes(col.key) ? 'right' : ''} ${isSorting && pendingSortKey === col.key ? 'header-cell--sorting' : ''}`}
-                    onClick={() => handleSort(col.key)}
-                  >
-                    {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div ref={headerScrollRef} style={{ overflow: 'hidden' }}>
-              <div
-                ref={headerRef}
-                className="header"
-                style={{ gridTemplateColumns: gridTemplate, minWidth: minScrollWidth }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setColMenuAnchor({ x: e.clientX, y: e.clientY });
-                }}
-              >
-                {visibleColumns.map((col) => (
-                  <div
-                    key={col.key}
-                    className={`header-cell ${['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate'].includes(col.key) ? 'right' : ''} ${isSorting && pendingSortKey === col.key ? 'header-cell--sorting' : ''}`}
-                    onClick={() => handleSort(col.key)}
-                  >
-                    {col.label} {sortBy.key === col.key ? (sortBy.asc ? '▲' : '▼') : ''}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <TrackTableHeader
+            headerScrollRef={headerScrollRef}
+            headerRef={headerRef}
+            gridTemplate={gridTemplate}
+            minScrollWidth={minScrollWidth}
+            visibleColumns={visibleColumns}
+            isSorting={isSorting}
+            pendingSortKey={pendingSortKey}
+            handleSort={handleSort}
+            sortBy={sortBy}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setColMenuAnchor({ x: e.clientX, y: e.clientY });
+            }}
+          />
 
           {colMenuAnchor && (
             <div
@@ -1449,97 +1573,34 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
             </div>
           )}
 
-          {/* Playlist view: full DnD list */}
-          {isPlaylistView ? (
-            tracks.length === 0 ? (
-              <div className="playlist-empty-state">
-                No tracks in this playlist.
-                <br />
-                Drag tracks from your library here, or right-click to add.
-              </div>
-            ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={sortedTracks.map((t) => t.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div ref={dndScrollRef} className="playlist-dnd-list">
-                    {sortedTracks.map((t, index) => (
-                      <SortableRow
-                        key={t.id}
-                        t={t}
-                        index={index}
-                        isSelected={selectedIds.has(t.id)}
-                        isPlaying={playingTrackId === t.id}
-                        onRowClick={handleRowClick}
-                        onDoubleClick={handleDoubleClick}
-                        onContextMenu={handleContextMenu}
-                        onRatingChange={handleRatingChange}
-                        onCueClick={handleCueClick}
-                        onDragStart={handleTrackDragStart}
-                        visibleColumns={visibleColumns}
-                        gridTemplate={gridTemplate}
-                        minScrollWidth={minScrollWidth}
-                        mediaPort={mediaPort}
-                        isNew={newTrackIds.has(t.id)}
-                        onAnimationEnd={handleRowAnimationEnd}
-                        isUnavailable={t.is_linked && unavailableLinkedIds.has(t.id)}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-                <DragOverlay>
-                  {activeTrack && (
-                    <div
-                      className="row row-drag-overlay"
-                      style={{ gridTemplateColumns: gridTemplate }}
-                    >
-                      <div className="cell index">⠿</div>
-                      <div className="cell title">{activeTrack.title}</div>
-                      <div className="cell artist">{activeTrack.artist || 'Unknown'}</div>
-                    </div>
-                  )}
-                </DragOverlay>
-              </DndContext>
-            )
-          ) : (
-            /* Library view: virtualised list */
-            <List
-              key={gridTemplate}
-              listRef={listRef}
-              defaultHeight={600}
-              rowCount={sortedTracks.length + (hasMore ? 1 : 0)}
-              rowHeight={ROW_HEIGHT}
-              width="100%"
-              style={{}}
-              onRowsRendered={handleItemsRendered}
-              className="track-list"
-              rowComponent={LibraryRow}
-              rowProps={{
-                tracks: sortedTracks,
-                selectedIds,
-                currentTrackId: playingTrackId,
-                onRowClick: handleRowClick,
-                onDoubleClick: handleDoubleClick,
-                onContextMenu: handleContextMenu,
-                onRatingChange: handleRatingChange,
-                onCueClick: handleCueClick,
-                onDragStart: handleTrackDragStart,
-                visibleColumns,
-                gridTemplate,
-                minScrollWidth,
-                mediaPort,
-                newTrackIds,
-                onAnimationEnd: handleRowAnimationEnd,
-                unavailableLinkedIds,
-              }}
-            />
-          )}
+          <TrackTableBody
+            isPlaylistView={isPlaylistView}
+            tracks={tracks}
+            sortedTracks={sortedTracks}
+            hasMore={hasMore}
+            gridTemplate={gridTemplate}
+            minScrollWidth={minScrollWidth}
+            dndScrollRef={dndScrollRef}
+            listRef={listRef}
+            handleItemsRendered={handleItemsRendered}
+            selectedIds={selectedIds}
+            playingTrackId={playingTrackId}
+            handleRowClick={handleRowClick}
+            handleDoubleClick={handleDoubleClick}
+            handleContextMenu={handleContextMenu}
+            handleRatingChange={handleRatingChange}
+            handleCueClick={handleCueClick}
+            handleTrackDragStart={handleTrackDragStart}
+            visibleColumns={visibleColumns}
+            mediaPort={mediaPort}
+            newTrackIds={newTrackIds}
+            handleRowAnimationEnd={handleRowAnimationEnd}
+            unavailableLinkedIds={unavailableLinkedIds}
+            sensors={sensors}
+            handleDragStart={handleDragStart}
+            handleDragEnd={handleDragEnd}
+            activeTrack={activeTrack}
+          />
         </div>
         {/* end .table-scroll-wrap */}
 
