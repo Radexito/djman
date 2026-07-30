@@ -35,7 +35,14 @@ import './MusicLibrary.css';
 const PAGE_SIZE = 50;
 const ROW_HEIGHT = 50;
 const PRELOAD_TRIGGER = 3;
-const RIGHT_ALIGNED_COLUMNS = new Set(['bpm', 'key_camelot', 'loudness', 'year', 'duration', 'bitrate']);
+const RIGHT_ALIGNED_COLUMNS = new Set([
+  'bpm',
+  'key_camelot',
+  'loudness',
+  'year',
+  'duration',
+  'bitrate',
+]);
 // Stable fallback so tests/mocks that stub usePlayer() without this field don't crash.
 const EMPTY_SET = new Set();
 
@@ -563,7 +570,10 @@ function TrackTableBody({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext items={sortedTracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext
+          items={sortedTracks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
           <div ref={dndScrollRef} className="playlist-dnd-list">
             {sortedTracks.map((t, index) => (
               <SortableRow
