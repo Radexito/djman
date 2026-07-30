@@ -4,6 +4,7 @@ import CloudSearchView from '../CloudSearchView.jsx';
 
 class MockAudio {
   constructor() {
+    MockAudio.instances.push(this);
     this._src = '';
     this.currentSrc = '';
     this.paused = true;
@@ -41,6 +42,7 @@ describe('CloudSearchView previews', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.Audio = MockAudio;
+    MockAudio.instances = [];
     MockAudio.emitErrorOnEmptySrc = false;
     window.api.cloudSearch.mockResolvedValue({
       ok: true,
@@ -64,12 +66,28 @@ describe('CloudSearchView previews', () => {
   });
 
   async function renderAndSearch() {
-    render(<CloudSearchView onGoToLibrary={vi.fn()} onGoToTidalSetup={vi.fn()} />);
+    const renderResult = render(
+      <CloudSearchView onGoToLibrary={vi.fn()} onGoToTidalSetup={vi.fn()} isActive />
+    );
     fireEvent.change(screen.getByPlaceholderText(/Search YouTube/), {
       target: { value: 'preview' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     await waitFor(() => expect(screen.getByText('Preview Me')).toBeInTheDocument());
+    return renderResult;
+  }
+
+  async function startPreview() {
+    await renderAndSearch();
+    fireEvent.click(screen.getByLabelText('Play inline preview for Preview Me'));
+    await waitFor(() => {
+      expect(window.api.cloudSearchPreview).toHaveBeenCalledWith({
+        source: 'youtube',
+        type: 'track',
+        url: 'https://youtube.com/watch?v=abc123',
+      });
+    });
+    await waitFor(() => expect(MockAudio.instances[0].play).toHaveBeenCalled());
   }
 
   it('keeps the external preview button', async () => {
@@ -80,17 +98,7 @@ describe('CloudSearchView previews', () => {
   });
 
   it('starts inline preview through cloudSearchPreview', async () => {
-    await renderAndSearch();
-
-    fireEvent.click(screen.getByLabelText('Play inline preview for Preview Me'));
-
-    await waitFor(() => {
-      expect(window.api.cloudSearchPreview).toHaveBeenCalledWith({
-        source: 'youtube',
-        type: 'track',
-        url: 'https://youtube.com/watch?v=abc123',
-      });
-    });
+    await startPreview();
   });
 
   it('does not show a preview error when search reset clears an empty audio source', async () => {
@@ -100,5 +108,26 @@ describe('CloudSearchView previews', () => {
 
     expect(screen.queryByText('Inline preview playback failed')).toBeNull();
     expect(screen.getByText('Preview Me')).toBeInTheDocument();
+  });
+
+  it('pauses inline preview when switching cloud-search source', async () => {
+    await startPreview();
+
+    fireEvent.click(screen.getByRole('button', { name: /TIDAL/i }));
+
+    expect(MockAudio.instances[0].pause).toHaveBeenCalled();
+  });
+
+  it('pauses inline preview when cloud search becomes inactive', async () => {
+    const { rerender } = await renderAndSearch();
+
+    fireEvent.click(screen.getByLabelText('Play inline preview for Preview Me'));
+    await waitFor(() => expect(MockAudio.instances[0].play).toHaveBeenCalled());
+
+    rerender(
+      <CloudSearchView onGoToLibrary={vi.fn()} onGoToTidalSetup={vi.fn()} isActive={false} />
+    );
+
+    expect(MockAudio.instances[0].pause).toHaveBeenCalled();
   });
 });

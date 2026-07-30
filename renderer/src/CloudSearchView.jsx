@@ -111,7 +111,12 @@ function getColumns(source, type) {
   ];
 }
 
-export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style }) {
+export default function CloudSearchView({
+  onGoToLibrary,
+  onGoToTidalSetup,
+  style,
+  isActive = true,
+}) {
   const [source, setSource] = useState('youtube');
   const [tidalType, setTidalType] = useState('track');
   const [query, setQuery] = useState('');
@@ -178,6 +183,30 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     };
   }, []);
 
+  const stopPreview = useCallback(
+    ({ clearTrack = true, clearError = false, clearCache = false } = {}) => {
+      suppressPreviewError.current = true;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      setPreviewLoadingKey(null);
+      setPreviewPlaying(false);
+      if (clearTrack) setPreviewTrackKey(null);
+      if (clearError) setPreviewError(null);
+      if (clearCache) previewUrlCache.current.clear();
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!isActive) stopPreview();
+  }, [isActive, stopPreview]);
+
+  useEffect(() => {
+    stopPreview();
+  }, [source, stopPreview]);
+
   const runSearch = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
@@ -189,15 +218,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     setDownloadError(null);
     setDownloadDone(false);
     setPreviewError(null);
-    setPreviewLoadingKey(null);
-    setPreviewTrackKey(null);
-    setPreviewPlaying(false);
-    previewUrlCache.current.clear();
-    if (audioRef.current) {
-      suppressPreviewError.current = true;
-      audioRef.current.pause();
-      audioRef.current.src = '';
-    }
+    stopPreview({ clearError: false, clearTrack: true, clearCache: true });
     try {
       const res = await window.api.cloudSearch({
         source,
@@ -219,7 +240,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
-  }, [query, source, tidalType]);
+  }, [query, source, stopPreview, tidalType]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
