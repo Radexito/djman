@@ -109,6 +109,7 @@ import {
   downloadUrl as ytDlpDownloadUrl,
   fetchPlaylistInfo as ytDlpFetchPlaylistInfo,
   searchYouTube,
+  getYouTubePreviewUrl,
 } from './audio/ytDlpManager.js';
 import {
   checkTidalSetup,
@@ -116,6 +117,7 @@ import {
   downloadTidal,
   fetchTidalInfo,
   searchTidal,
+  getTidalPreviewUrl,
 } from './audio/tidalDlManager.js';
 import { generateWaveformOverview } from './audio/waveformGenerator.js';
 import { ensureDeps, getFfmpegRuntimePath } from './deps.js';
@@ -1384,6 +1386,27 @@ ipcMain.handle('cloud-search', async (_event, { source, query, types, limit }) =
     return { ok: false, error: `Unknown source: ${source}` };
   } catch (err) {
     console.error('[cloud-search] error:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('cloud-search-preview', async (_event, { source, type, url }) => {
+  if (!url) return { ok: false, error: 'Missing result URL' };
+
+  try {
+    if (source === 'youtube') {
+      const previewUrl = await getYouTubePreviewUrl(url);
+      return { ok: true, url: previewUrl };
+    }
+    if (source === 'tidal') {
+      if (type !== 'track') {
+        return { ok: false, error: 'Inline preview is only available for TIDAL track results' };
+      }
+      return await getTidalPreviewUrl(url);
+    }
+    return { ok: false, error: `Unknown source: ${source}` };
+  } catch (err) {
+    console.error('[cloud-search-preview] error:', err.message);
     return { ok: false, error: err.message };
   }
 });

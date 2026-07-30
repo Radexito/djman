@@ -382,6 +382,45 @@ export async function searchYouTube(query, options = {}) {
     }));
 }
 
+export async function getYouTubePreviewUrl(url) {
+  const ytDlp = getYtDlpRuntimePath();
+  const args = [
+    '--no-playlist',
+    '--get-url',
+    '--format',
+    'bestaudio/best',
+    '--no-warnings',
+    '--extractor-args',
+    'youtube:player_client=android_vr,web',
+    url,
+  ];
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ytDlp, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    proc.on('error', (err) => reject(err));
+    proc.on('close', (code) => {
+      const previewUrl = stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find(Boolean);
+      if (code === 0 && previewUrl) {
+        resolve(previewUrl);
+        return;
+      }
+      reject(new Error(stderr.trim() || 'Unable to resolve YouTube preview stream'));
+    });
+  });
+}
+
 /**
  * Download audio from a URL using yt-dlp.
  * Supports both single tracks and playlists — always resolves with an array of file results.

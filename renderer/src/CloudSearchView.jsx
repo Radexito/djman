@@ -124,8 +124,14 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
   const [downloadStatus, setDownloadStatus] = useState(new Map()); // key -> 'pending'|'downloading'|'done'|'failed'
   const [downloadError, setDownloadError] = useState(null);
   const [downloadDone, setDownloadDone] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
+  const [previewLoadingKey, setPreviewLoadingKey] = useState(null);
+  const [previewTrackKey, setPreviewTrackKey] = useState(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const inputRef = useRef(null);
   const searchSeq = useRef(0);
+  const audioRef = useRef(null);
+  const previewUrlCache = useRef(new Map());
 
   useEffect(() => {
     window.api.tidalCheck?.().then(setTidalSetup);
@@ -135,37 +141,74 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const audio = new Audio();
+    audioRef.current = audio;
+
+    const handleEnded = () => setPreviewPlaying(false);
+    const handlePause = () => setPreviewPlaying(false);
+    const handlePlay = () => setPreviewPlaying(true);
+    const handleError = () => {
+      setPreviewError('Inline preview playback failed');
+      setPreviewPlaying(false);
+      setPreviewTrackKey(null);
+    };
+
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.pause();
+      audio.src = '';
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('error', handleError);
+    };
+  }, []);
+
   const runSearch = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
     const seq = ++searchSeq.current;
     setSearching(true);
     setSearchError(null);
-    setSelected(new Set());
-    setDownloadStatus(new Map());
-    setDownloadError(null);
-    setDownloadDone(false);
-    try {
-      const res = await window.api.cloudSearch({
-        source,
-        query: q,
-        types: source === 'tidal' ? [tidalType] : undefined,
-        limit: 25,
-      });
-      if (seq !== searchSeq.current) return; // stale response — a newer search started
-      if (!res.ok) {
-        setSearchError(res.error || 'Search failed');
-        setResults([]);
-      } else {
-        setResults(res.results);
+      setSelected(new Set());
+      setDownloadStatus(new Map());
+      setDownloadError(null);
+      setDownloadDone(false);
+      setPreviewError(null);
+      setPreviewLoadingKey(null);
+      setPreviewTrackKey(null);
+      setPreviewPlaying(false);
+      previewUrlCache.current.clear();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
       }
-    } catch (e) {
-      if (seq !== searchSeq.current) return;
-      setSearchError(e.message ?? 'Search failed');
-      setResults([]);
-    } finally {
-      if (seq === searchSeq.current) setSearching(false);
-    }
+      try {
+        const res = await window.api.cloudSearch({
+          source,
+          query: q,
+          types: source === 'tidal' ? [tidalType] : undefined,
+          limit: 25,
+        });
+        if (seq !== searchSeq.current) return; // stale response — a newer search started
+        if (!res.ok) {
+          setSearchError(res.error || 'Search failed');
+          setResults([]);
+        } else {
+          setResults(res.results);
+        }
+      } catch (e) {
+        if (seq !== searchSeq.current) return;
+        setSearchError(e.message ?? 'Search failed');
+        setResults([]);
+      } finally {
+        if (seq === searchSeq.current) setSearching(false);
+      }
   }, [query, source, tidalType]);
 
   const handleSubmit = (e) => {
@@ -195,6 +238,61 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
     e.stopPropagation();
     if (r.url) window.api.openExternal(r.url);
   };
+
+  const canInlinePreview = useCallback(
+    (r) => r.source === 'youtube' || (r.source === 'tidal' && r.type === 'track'),
+    []
+  );
+
+  const handleInlinePreview = useCallback(async (e, r) => {
+    e.stopPropagation();
+    const key = resultKey(r);
+    const audio = audioRef.current;
+    if (!audio || !canInlinePreview(r) || previewLoadingKey === key) return;
+
+    setPreviewError(null);
+
+    if (previewTrackKey === key) {
+      if (previewPlaying) {
+        audio.pause();
+      } else {
+        try {
+          await audio.play();
+          setPreviewPlaying(true);
+        } catch (err) {
+          setPreviewError(err.message ?? 'Inline preview playback failed');
+        }
+      }
+      return;
+    }
+
+    setPreviewLoadingKey(key);
+    try {
+      let previewUrl = previewUrlCache.current.get(key);
+      if (!previewUrl) {
+        const res = await window.api.cloudSearchPreview({
+          source: r.source,
+          type: r.type,
+          url: r.url,
+        });
+        if (!res.ok || !res.url) throw new Error(res.error || 'Inline preview is unavailable');
+        previewUrl = res.url;
+        previewUrlCache.current.set(key, previewUrl);
+      }
+
+      audio.pause();
+      audio.src = previewUrl;
+      setPreviewTrackKey(key);
+      await audio.play();
+      setPreviewPlaying(true);
+    } catch (err) {
+      setPreviewError(err.message ?? 'Inline preview playback failed');
+      setPreviewTrackKey(null);
+      setPreviewPlaying(false);
+    } finally {
+      setPreviewLoadingKey(null);
+    }
+  }, [canInlinePreview, previewLoadingKey, previewPlaying, previewTrackKey]);
 
   const handleDownload = async () => {
     if (selectedResults.length === 0 || downloading) return;
@@ -356,6 +454,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
 
       {searchError && <div className="cloud-search-error">{searchError}</div>}
       {downloadError && <div className="cloud-search-error">{downloadError}</div>}
+      {previewError && <div className="cloud-search-error">{previewError}</div>}
       {downloadDone && !downloading && (
         <div className="cloud-search-notice">
           Download finished.{' '}
@@ -368,7 +467,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
       {results.length > 0 &&
         (() => {
           const columns = getColumns(results[0]?.source, results[0]?.type);
-          const gridTemplateColumns = `28px ${columns.map((c) => c.width).join(' ')} 28px 20px`;
+          const gridTemplateColumns = `28px ${columns.map((c) => c.width).join(' ')} 28px 28px 20px`;
           return (
             <div className="cloud-search-results">
               <div className="cloud-search-results-header">
@@ -401,6 +500,7 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
                   ))}
                   <span />
                   <span />
+                  <span />
                 </div>
                 {results.map((r) => {
                   const k = resultKey(r);
@@ -428,6 +528,27 @@ export default function CloudSearchView({ onGoToLibrary, onGoToTidalSetup, style
                           {c.render(r)}
                         </span>
                       ))}
+                      <span onClick={(e) => e.stopPropagation()}>
+                        {canInlinePreview(r) && (
+                          <button
+                            type="button"
+                            className="cloud-search-preview-btn"
+                            title={
+                              previewTrackKey === k && previewPlaying
+                                ? `Pause inline preview for "${r.title}"`
+                                : `Play inline preview for "${r.title}"`
+                            }
+                            aria-label={
+                              previewTrackKey === k && previewPlaying
+                                ? `Pause inline preview for ${r.title}`
+                                : `Play inline preview for ${r.title}`
+                            }
+                            onClick={(e) => handleInlinePreview(e, r)}
+                          >
+                            {previewLoadingKey === k ? '…' : previewTrackKey === k && previewPlaying ? '⏸' : '▶'}
+                          </button>
+                        )}
+                      </span>
                       <span onClick={(e) => e.stopPropagation()}>
                         {r.url && (
                           <button
