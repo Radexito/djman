@@ -12,6 +12,21 @@ import './BeatGridEditor.css';
 const FALLBACK_COLS_PER_SEC = 150;
 const ZOOM_LEVELS = [1000, 2000, 4000, 8000, 16000, 32000]; // ms visible in detail canvas
 
+function getDetailMsPerCol(detail, trackDurationMs) {
+  if (!detail || detail.length < 3) return null;
+  const numCols = Math.floor(detail.length / 3);
+  if (numCols <= 0) return null;
+  const totalMs =
+    trackDurationMs > 0 ? trackDurationMs : (numCols / FALLBACK_COLS_PER_SEC) * 1000;
+  return totalMs / numCols;
+}
+
+function snapToDetailGrid(ms, detail, trackDurationMs) {
+  const msPerCol = getDetailMsPerCol(detail, trackDurationMs);
+  if (!msPerCol) return ms;
+  return Math.round(ms / msPerCol) * msPerCol;
+}
+
 /** Compute beat array from beatgrid JSON + bpm + offset (ms). */
 function computeBeats(beatgridJson, bpm, offsetMs = 0) {
   let beats = [];
@@ -69,9 +84,6 @@ function drawDetail(canvas, detail, viewCenter, beats, cuePoints, viewMs, trackD
   // ── Waveform ───────────────────────────────────────────────────────────────
   if (detail && detail.length >= 3) {
     const numCols = Math.floor(detail.length / 3);
-    // Derive the buffer's actual cols/sec from its column count and the real
-    // track duration, rather than assuming a fixed rate — the buffer may be
-    // the 600 cols/sec hires version or the legacy 150 cols/sec version.
     const totalMs =
       trackDurationMs > 0 ? trackDurationMs : (numCols / FALLBACK_COLS_PER_SEC) * 1000;
 
@@ -427,7 +439,7 @@ export default function BeatGridEditor({ track, onClose, onApply }) {
 
       // Auto-scroll: keep the playhead centred — no Min clamp so it works from t=0
       if (isThisTrackRef.current && isPlayingRef.current && !userScrollingRef.current) {
-        viewCenterRef.current = playheadMs;
+        viewCenterRef.current = snapToDetailGrid(playheadMs, waveformDetailRef.current, dur);
       }
 
       const vc = viewCenterRef.current;
