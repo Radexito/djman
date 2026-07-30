@@ -1983,12 +1983,13 @@ ipcMain.handle(
 
       // Load existing manifest so we can merge with previously exported tracks/playlists
       const { tracks: existingTracks, playlists: existingPlaylists } = loadManifest(usbRoot);
-      const existingCount = existingTracks.size;
+      const copyTargets = tracks.filter(
+        (t) => !reuseExistingUsbTrack(existingTracks, t.id, new Map())
+      );
+      const copyTotal = copyTargets.length;
 
       send('export-rekordbox-progress', {
-        msg: existingCount
-          ? `Merging ${total} tracks into existing export (${existingCount} tracks already on USB)…`
-          : `Exporting ${total} tracks…`,
+        msg: `Exporting ${total} tracks…`,
         pct: 0,
       });
 
@@ -2002,6 +2003,7 @@ ipcMain.handle(
       // 2. Copy files to USB, build USB path map
       const usbPaths = new Map(); // trackId → USB path
       const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
+      let copiedCount = 0;
       for (let i = 0; i < tracks.length; i++) {
         const t = tracks[i];
         const reused = reuseExistingUsbTrack(existingTracks, t.id, usedNames);
@@ -2017,9 +2019,13 @@ ipcMain.handle(
           });
           usbPaths.set(t.id, usbPath);
           if (meta) usbMeta.set(t.id, meta);
+          copiedCount += 1;
         }
+        const copyMsg = copyTotal
+          ? `Copying files… ${copiedCount}/${copyTotal}`
+          : 'Copying files… all tracks already on USB';
         send('export-rekordbox-progress', {
-          msg: `Copying files… ${i + 1}/${total}`,
+          msg: copyMsg,
           pct: Math.round(((i + 1) / total) * 40),
         });
       }
@@ -2141,12 +2147,13 @@ ipcMain.handle(
 
       // Load existing manifest for merging
       const { tracks: existingTracks, playlists: existingPlaylists } = loadManifest(usbRoot);
-      const existingCount = existingTracks.size;
+      const copyTargets = allTracks.filter(
+        (t) => !reuseExistingUsbTrack(existingTracks, t.id, new Map())
+      );
+      const copyTotal = copyTargets.length;
 
       send('export-all-progress', {
-        msg: existingCount
-          ? `Merging ${total} tracks into existing export (${existingCount} tracks already on USB)…`
-          : `Exporting ${total} tracks…`,
+        msg: `Exporting ${total} tracks…`,
         pct: 0,
       });
 
@@ -2160,6 +2167,7 @@ ipcMain.handle(
       // Copy files once
       const usbPaths = new Map();
       const usbMeta = new Map(); // trackId → { fileSize, bitrate } override, only set on re-encode
+      let copiedCount = 0;
       for (let i = 0; i < allTracks.length; i++) {
         const t = allTracks[i];
         const reused = reuseExistingUsbTrack(existingTracks, t.id, usedNames);
@@ -2175,9 +2183,13 @@ ipcMain.handle(
           });
           usbPaths.set(t.id, usbPath);
           if (meta) usbMeta.set(t.id, meta);
+          copiedCount += 1;
         }
+        const copyMsg = copyTotal
+          ? `Copying files… ${copiedCount}/${copyTotal}`
+          : 'Copying files… all tracks already on USB';
         send('export-all-progress', {
-          msg: `Copying files… ${i + 1}/${total}`,
+          msg: copyMsg,
           pct: Math.round(((i + 1) / total) * 35),
         });
       }
