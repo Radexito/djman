@@ -175,6 +175,18 @@ describe('Sidebar', () => {
     expect(menu).toHaveClass('context-menu--flip-left');
     expect(menu).toHaveClass('context-menu--flip-up');
   });
+
+  it('uses the dedicated color submenu grid so swatches stay inside the menu panel', async () => {
+    window.api.getPlaylists.mockResolvedValueOnce([
+      { id: 1, name: 'Techno Set', color: null, track_count: 0, total_duration: 0 },
+    ]);
+
+    const { container } = renderSidebar({ ...defaultProps });
+    await waitFor(() => screen.getByText('Techno Set'));
+    fireEvent.contextMenu(screen.getByText('Techno Set'), { clientX: 50, clientY: 50 });
+
+    expect(container.querySelector('.context-submenu--colors')).toBeInTheDocument();
+  });
 });
 
 describe('Sidebar — import dialog playlist association', () => {

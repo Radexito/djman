@@ -631,7 +631,7 @@ function Sidebar({
           </div>
           <div className="context-menu-item context-menu-item--has-submenu">
             🎨 Color
-            <div className="context-submenu">
+            <div className="context-submenu context-submenu--colors">
               {PRESET_COLORS.map((c) => (
                 <div
                   key={c}
