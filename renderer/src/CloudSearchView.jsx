@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { usePlayer } from './PlayerContext.jsx';
 import './CloudSearchView.css';
 
 const SOURCES = [
@@ -117,6 +118,7 @@ export default function CloudSearchView({
   style,
   isActive = true,
 }) {
+  const { audioRef: mainAudioRef } = usePlayer() ?? {};
   const [source, setSource] = useState('youtube');
   const [tidalType, setTidalType] = useState('track');
   const [query, setQuery] = useState('');
@@ -138,6 +140,8 @@ export default function CloudSearchView({
   const audioRef = useRef(null);
   const previewUrlCache = useRef(new Map());
   const suppressPreviewError = useRef(false);
+  const previewPlaybackModeRef = useRef('overlay');
+  const pausedMainForPreviewRef = useRef(false);
 
   useEffect(() => {
     window.api.tidalCheck?.().then(setTidalSetup);
@@ -147,11 +151,67 @@ export default function CloudSearchView({
     inputRef.current?.focus();
   }, []);
 
+  const resumeMainPlaybackIfNeeded = useCallback(() => {
+    const mainAudio = mainAudioRef?.current;
+    if (
+      previewPlaybackModeRef.current === 'pause-main' &&
+      pausedMainForPreviewRef.current &&
+      mainAudio?.paused
+    ) {
+      pausedMainForPreviewRef.current = false;
+      mainAudio.play().catch(() => {});
+      return;
+    }
+    pausedMainForPreviewRef.current = false;
+  }, [mainAudioRef]);
+
+  const stopPreview = useCallback(
+    ({ clearTrack = true, clearError = false, clearCache = false } = {}) => {
+      suppressPreviewError.current = true;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      setPreviewLoadingKey(null);
+      setPreviewPlaying(false);
+      if (clearTrack) setPreviewTrackKey(null);
+      if (clearError) setPreviewError(null);
+      if (clearCache) previewUrlCache.current.clear();
+      resumeMainPlaybackIfNeeded();
+    },
+    [resumeMainPlaybackIfNeeded]
+  );
+
+  const pauseMainPlaybackForPreview = useCallback(async () => {
+    const mode = await window.api.getSetting('cloud_preview_playback_mode', 'overlay');
+    previewPlaybackModeRef.current = mode;
+    const mainAudio = mainAudioRef?.current;
+    if (mode === 'pause-main' && mainAudio && !mainAudio.paused) {
+      pausedMainForPreviewRef.current = true;
+      mainAudio.pause();
+    } else {
+      pausedMainForPreviewRef.current = false;
+    }
+  }, [mainAudioRef]);
+
+  const resetSearchState = useCallback(() => {
+    setResults([]);
+    setSelected(new Set());
+    setDownloadStatus(new Map());
+    setDownloadError(null);
+    setDownloadDone(false);
+    setSearchError(null);
+  }, []);
+
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
 
-    const handleEnded = () => setPreviewPlaying(false);
+    const handleEnded = () => {
+      setPreviewPlaying(false);
+      setPreviewTrackKey(null);
+      resumeMainPlaybackIfNeeded();
+    };
     const handlePause = () => setPreviewPlaying(false);
     const handlePlay = () => {
       suppressPreviewError.current = false;
@@ -173,31 +233,13 @@ export default function CloudSearchView({
     audio.addEventListener('error', handleError);
 
     return () => {
-      suppressPreviewError.current = true;
-      audio.pause();
-      audio.src = '';
+      stopPreview({ clearTrack: true, clearError: false, clearCache: false });
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('error', handleError);
     };
-  }, []);
-
-  const stopPreview = useCallback(
-    ({ clearTrack = true, clearError = false, clearCache = false } = {}) => {
-      suppressPreviewError.current = true;
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
-      setPreviewLoadingKey(null);
-      setPreviewPlaying(false);
-      if (clearTrack) setPreviewTrackKey(null);
-      if (clearError) setPreviewError(null);
-      if (clearCache) previewUrlCache.current.clear();
-    },
-    []
-  );
+  }, [resumeMainPlaybackIfNeeded, stopPreview]);
 
   useEffect(() => {
     if (!isActive) stopPreview();
@@ -242,9 +284,52 @@ export default function CloudSearchView({
     }
   }, [query, source, stopPreview, tidalType]);
 
+  const runSearchFor = useCallback(
+    async (nextSource, nextType = tidalType) => {
+      const q = query.trim();
+      if (!q) return;
+      const seq = ++searchSeq.current;
+      setSearching(true);
+      resetSearchState();
+      setPreviewError(null);
+      stopPreview({ clearError: false, clearTrack: true, clearCache: true });
+      try {
+        const res = await window.api.cloudSearch({
+          source: nextSource,
+          query: q,
+          types: nextSource === 'tidal' ? [nextType] : undefined,
+          limit: 25,
+        });
+        if (seq !== searchSeq.current) return;
+        if (!res.ok) {
+          setSearchError(res.error || 'Search failed');
+          setResults([]);
+        } else {
+          setResults(res.results);
+        }
+      } catch (e) {
+        if (seq !== searchSeq.current) return;
+        setSearchError(e.message ?? 'Search failed');
+        setResults([]);
+      } finally {
+        if (seq === searchSeq.current) setSearching(false);
+      }
+    },
+    [query, resetSearchState, stopPreview, tidalType]
+  );
+
   const handleSubmit = (e) => {
     e.preventDefault();
     runSearch();
+  };
+
+  const handleSourceChange = (nextSource) => {
+    if (nextSource === source) return;
+    setSource(nextSource);
+    resetSearchState();
+    if (query.trim()) {
+      runSearchFor(nextSource);
+    }
   };
 
   const toggleSelected = (r) => {
@@ -286,9 +371,10 @@ export default function CloudSearchView({
 
       if (previewTrackKey === key) {
         if (previewPlaying) {
-          audio.pause();
+          stopPreview();
         } else {
           try {
+            await pauseMainPlaybackForPreview();
             suppressPreviewError.current = false;
             await audio.play();
             setPreviewPlaying(true);
@@ -313,6 +399,7 @@ export default function CloudSearchView({
           previewUrlCache.current.set(key, previewUrl);
         }
 
+        await pauseMainPlaybackForPreview();
         suppressPreviewError.current = true;
         audio.pause();
         audio.src = previewUrl;
@@ -329,7 +416,14 @@ export default function CloudSearchView({
         setPreviewLoadingKey(null);
       }
     },
-    [canInlinePreview, previewLoadingKey, previewPlaying, previewTrackKey]
+    [
+      canInlinePreview,
+      pauseMainPlaybackForPreview,
+      previewLoadingKey,
+      previewPlaying,
+      previewTrackKey,
+      stopPreview,
+    ]
   );
 
   const handleDownload = async () => {
@@ -436,7 +530,7 @@ export default function CloudSearchView({
           <button
             key={s.id}
             className={`cloud-search-source-btn${source === s.id ? ' active' : ''}`}
-            onClick={() => setSource(s.id)}
+            onClick={() => handleSourceChange(s.id)}
             type="button"
           >
             <span>{s.icon}</span> {s.label}
