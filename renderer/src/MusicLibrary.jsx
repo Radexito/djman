@@ -793,17 +793,23 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
           const newRows = rows.filter((r) => !existingIds.has(r.id));
           if (newRows.length > 0) {
             setNewTrackIds((prev) => new Set([...prev, ...newRows.map((r) => r.id)]));
+            const prevTracks = tracks;
+            const prevIds = new Set(prevTracks.map((t) => t.id));
+            const deduped = newRows.filter((r) => !prevIds.has(r.id));
             setTracks((prev) => {
-              const prevIds = new Set(prev.map((t) => t.id));
-              const deduped = newRows.filter((r) => !prevIds.has(r.id));
-              if (deduped.length === 0) return prev;
-              const merged = [...prev, ...deduped];
-              // Keep the player queue in sync when playing from the music (all-tracks) view.
-              if (currentPlaylistIdRef.current === null) {
-                updateQueueRef.current(merged);
-              }
-              return merged;
+              const prevIds2 = new Set(prev.map((t) => t.id));
+              const deduped2 = newRows.filter((r) => !prevIds2.has(r.id));
+              if (deduped2.length === 0) return prev;
+              return [...prev, ...deduped2];
             });
+            // Keep the player queue in sync when playing from the music (all-tracks) view.
+            // IMPORTANT: updateQueue() calls setState on PlayerProvider, so it must run
+            // OUTSIDE the setTracks updater above — calling it inside the updater throws
+            // "Cannot update a component (PlayerProvider) while rendering a different
+            // component (MusicLibrary)" on import (#import-crash).
+            if (currentPlaylistIdRef.current === null && deduped.length > 0) {
+              updateQueueRef.current([...prevTracks, ...deduped]);
+            }
             offsetRef.current = sortedTracksRef.current.length + newRows.length;
             // If the batch we fetched is smaller than a full page, we've reached the end.
             if (rows.length < PAGE_SIZE) {
