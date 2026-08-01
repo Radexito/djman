@@ -1,5 +1,23 @@
 import '@testing-library/jest-dom';
 
+// jsdom under newer Node (26+) does not provide localStorage by default.
+// Provide a minimal in-memory implementation so component code that reads
+// localStorage at render time (e.g. MusicLibrary useState initializer)
+// does not crash.
+if (typeof globalThis.localStorage === 'undefined') {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+    key: (i) => Array.from(store.keys())[i] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+}
+
 // Mock window.api for all renderer tests
 const noop = () => () => {}; // returns unsubscribe fn
 
