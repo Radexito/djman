@@ -140,8 +140,10 @@ import { resolveExportFormat } from './usb/deviceFormats.js';
 import { getResetCleanupTargets, startResetCleanup } from './resetCleanup.js';
 import {
   getCuePoints,
+  getCuePointById,
   addCuePoint,
   updateCuePoint,
+  renumberSequentialCuesAfter,
   deleteCuePoint,
   deleteAllCuePoints,
   deleteAllCuePointsLibrary,
@@ -436,7 +438,12 @@ ipcMain.handle('get-track-waveform', (_, trackId) => {
   return buf ? new Uint8Array(buf) : null;
 });
 ipcMain.handle('get-setting', (_, key, def) => getSetting(key, def));
-ipcMain.handle('set-setting', (_, key, value) => setSetting(key, value));
+ipcMain.handle('set-setting', (_, key, value) => {
+  setSetting(key, value);
+  // Let the renderer react to settings changes live (e.g. hide the cue
+  // indicator column when auto-cue generation is toggled, #263).
+  global.mainWindow?.webContents.send('settings-updated', { key, value });
+});
 // `libraryId` defaults to the current "import target" library when omitted —
 // most existing call sites predate multi-library support and don't pass one.
 ipcMain.handle('get-library-path', (_, libraryId) =>
@@ -751,11 +758,20 @@ ipcMain.handle('get-cue-points', (_, trackId) => getCuePoints(trackId));
 
 ipcMain.handle('add-cue-point', (_, { trackId, positionMs, label, color, hotCueIndex }) => {
   const id = addCuePoint({ trackId, positionMs, label, color, hotCueIndex });
+  // Adding a sequentially-named cue shifts the positional order — renumber the
+  // following auto-named cues so names stay unique (#253).
+  renumberSequentialCuesAfter(trackId, id);
   return { id };
 });
 
 ipcMain.handle('update-cue-point', (_, { id, label, color, hotCueIndex, enabled }) => {
+  const before = getCuePointById(id);
   updateCuePoint(id, { label, color, hotCueIndex, enabled });
+  // Renaming a cue to a sequential name (e.g. the newly inserted "Cue 2")
+  // must cascade a renumber onto the following auto-named cues (#253).
+  if (before && typeof label === 'string') {
+    renumberSequentialCuesAfter(before.track_id, id);
+  }
   return { ok: true };
 });
 
