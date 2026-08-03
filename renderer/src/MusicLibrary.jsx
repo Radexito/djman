@@ -862,13 +862,16 @@ function MusicLibrary({ selectedPlaylist, search, onSearchChange }) {
   // Auto-cue setting: initial value + live updates from the Settings modal
   // (main broadcasts 'settings-updated' on every set-setting call).
   useEffect(() => {
-    window.api
-      .getSetting('auto_cue_on_import', 'false')
-      .then((v) => setAutoCueOnImport(v === 'true'));
-    const unsub = window.api.onSettingsUpdated(({ key, value }) => {
-      if (key === 'auto_cue_on_import') setAutoCueOnImport(value === 'true');
-    });
-    return unsub;
+    const api = window.api ?? {};
+    if (typeof api.getSetting === 'function') {
+      api.getSetting('auto_cue_on_import', 'false').then((v) => setAutoCueOnImport(v === 'true'));
+    }
+    if (typeof api.onSettingsUpdated === 'function') {
+      return api.onSettingsUpdated(({ key, value }) => {
+        if (key === 'auto_cue_on_import') setAutoCueOnImport(value === 'true');
+      });
+    }
+    return undefined;
   }, []);
 
   // DnD sensors
