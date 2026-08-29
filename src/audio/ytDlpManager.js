@@ -366,7 +366,10 @@ function _fetchPlaylistInfoOnce(url, options = {}) {
  */
 export async function searchYouTube(query, options = {}) {
   const limit = options.limit ?? 20;
-  const info = await fetchPlaylistInfo(`ytsearch${limit}:${query}`);
+  // Pass cookiesBrowser (and any other options) through so YouTube searches
+  // authenticate the same way fetch-info / download do. Without it, YouTube
+  // returns "Sign in to confirm you're not a bot" on search (#466).
+  const info = await fetchPlaylistInfo(`ytsearch${limit}:${query}`, options);
   return info.entries
     .filter((e) => !e.unavailable)
     .map((e) => ({
