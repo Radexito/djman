@@ -11,17 +11,17 @@ function formatTime(s) {
   return `${m}:${sec}`;
 }
 
-export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
+export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch, onOpenTrackDetails }) {
   const {
     mediaPort,
     currentTrack,
     currentPlaylistId,
     currentPlaylistName,
     isPlaying,
-    currentTime,
-    duration,
     shuffle,
     repeat,
+    currentTime,
+    duration,
     outputDeviceId,
     volume,
     history,
@@ -148,6 +148,7 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     const W = canvas.width;
     const H = canvas.height;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     ctx.clearRect(0, 0, W, H);
     if (!data || data.length < 4) return;
 
@@ -309,13 +310,13 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
     const canvas = waveCanvasRef.current;
     if (!currentTrack) {
       waveDataRef.current = null;
-      if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
     window.api.getTrackWaveform(currentTrack.id).then((raw) => {
       waveDataRef.current = raw ? new Uint8Array(raw) : null;
       if (!waveDataRef.current && canvas) {
-        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
       } else {
         paintWaveform();
       }
@@ -353,11 +354,51 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
       )}
       {/* Left: album art + current track info */}
       <div className="player-left">
-        {artSrc ? (
-          <img className="player-art" src={artSrc} alt="Album art" draggable={false} />
-        ) : (
-          <div className="player-art player-art--placeholder">♪</div>
-        )}
+        <div className="player-controls-grid" aria-label="Playback controls">
+          <button
+            type="button"
+            className={`player-btn player-btn--toggle${shuffle ? ' player-btn--active' : ''}`}
+            onClick={toggleShuffle}
+            title="Shuffle"
+          >
+            ⇄
+          </button>
+          <button type="button" className="player-btn" onClick={prev} title="Previous">
+            ⏮
+          </button>
+          <button type="button" className="player-btn" onClick={next} title="Next">
+            ⏭
+          </button>
+          <button
+            type="button"
+            className={`player-btn player-btn--toggle${repeat !== 'none' ? ' player-btn--active' : ''}`}
+            onClick={cycleRepeat}
+            title={`Repeat: ${repeat}`}
+          >
+            {repeat === 'one' ? '↺¹' : '↺'}
+          </button>
+          <button
+            type="button"
+            className="player-btn player-btn--play"
+            onClick={togglePlay}
+            title="Play / Pause"
+          >
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+        </div>
+        <button
+          type="button"
+          className={`player-art-btn${currentTrack ? ' player-art-btn--enabled' : ''}`}
+          onClick={() => currentTrack && onOpenTrackDetails?.(currentTrack.id, currentPlaylistId)}
+          title={currentTrack ? 'Open track details' : undefined}
+          disabled={!currentTrack}
+        >
+          {artSrc ? (
+            <img className="player-art" src={artSrc} alt="Album art" draggable={false} />
+          ) : (
+            <div className="player-art player-art--placeholder">♪</div>
+          )}
+        </button>
         <div className="player-track-info">
           {currentTrack ? (
             <>
@@ -387,81 +428,53 @@ export default function PlayerBar({ onNavigateToPlaylist, onArtistSearch }) {
         </div>
       </div>
 
-      {/* Center: transport controls + seekbar */}
-      <div className="player-center">
-        <div className="player-controls">
-          <button
-            className={`player-btn player-btn--toggle${shuffle ? ' player-btn--active' : ''}`}
-            onClick={toggleShuffle}
-            title="Shuffle"
-          >
-            ⇄
-          </button>
-          <button className="player-btn" onClick={prev} title="Previous">
-            ⏮
-          </button>
-          <button className="player-btn player-btn--play" onClick={togglePlay} title="Play / Pause">
-            {isPlaying ? '⏸' : '▶'}
-          </button>
-          <button className="player-btn" onClick={next} title="Next">
-            ⏭
-          </button>
-          <button
-            className={`player-btn player-btn--toggle${repeat !== 'none' ? ' player-btn--active' : ''}`}
-            onClick={cycleRepeat}
-            title={`Repeat: ${repeat}`}
-          >
-            {repeat === 'one' ? '↺¹' : '↺'}
-          </button>
+      {/* Center: full-width seekbar / waveform */}
+      <div className="player-seek">
+        <span className="player-time">{formatTime(currentTime)}</span>
+        <div className="player-seekbar-wrap">
+          <div ref={seekbarBgRef} className="player-seekbar-bg" />
+          <canvas ref={waveCanvasRef} className="player-waveform-canvas" />
+          <input
+            ref={seekbarRef}
+            type="range"
+            className="player-seekbar"
+            min={0}
+            max={duration || 0}
+            step={0.5}
+            defaultValue={0}
+            onPointerDown={(e) => {
+              console.log(`[seekbar] pointerDown value=${Number(e.target.value).toFixed(3)}`);
+              seekingRef.current = true;
+            }}
+            onPointerUp={(e) => {
+              const val = Number(e.target.value);
+              console.log(`[seekbar] pointerUp  value=${val.toFixed(3)}`);
+              seek(val);
+              seekingRef.current = false;
+            }}
+          />
+          {duration > 0 &&
+            cuePoints
+              .filter((cue) => (cue.hot_cue_index >= 0 ? showHotCues : showMemCues))
+              .map((cue) => {
+                const pct = Math.min((cue.position_ms / 1000 / duration) * 100, 100);
+                return (
+                  <button
+                    key={cue.id}
+                    className="player-cue-marker"
+                    style={{ left: `${pct}%`, background: cue.color }}
+                    title={
+                      cue.label ||
+                      (cue.hot_cue_index >= 0
+                        ? `Hot cue ${'ABCDEFGHIJKLMNOP'[cue.hot_cue_index]}`
+                        : 'Memory cue')
+                    }
+                    onClick={() => seek(cue.position_ms / 1000)}
+                  />
+                );
+              })}
         </div>
-
-        <div className="player-seek">
-          <span className="player-time">{formatTime(currentTime)}</span>
-          <div className="player-seekbar-wrap">
-            <div ref={seekbarBgRef} className="player-seekbar-bg" />
-            <canvas ref={waveCanvasRef} className="player-waveform-canvas" />
-            <input
-              ref={seekbarRef}
-              type="range"
-              className="player-seekbar"
-              min={0}
-              max={duration || 0}
-              step={0.5}
-              defaultValue={0}
-              onPointerDown={(e) => {
-                console.log(`[seekbar] pointerDown value=${Number(e.target.value).toFixed(3)}`);
-                seekingRef.current = true;
-              }}
-              onPointerUp={(e) => {
-                const val = Number(e.target.value);
-                console.log(`[seekbar] pointerUp  value=${val.toFixed(3)}`);
-                seek(val);
-                seekingRef.current = false;
-              }}
-            />
-            {duration > 0 &&
-              cuePoints
-                .filter((cue) => (cue.hot_cue_index >= 0 ? showHotCues : showMemCues))
-                .map((cue) => {
-                  const pct = Math.min((cue.position_ms / 1000 / duration) * 100, 100);
-                  return (
-                    <button
-                      key={cue.id}
-                      className="player-cue-marker"
-                      style={{ left: `${pct}%`, background: cue.color }}
-                      title={
-                        cue.label ||
-                        (cue.hot_cue_index >= 0
-                          ? `Hot cue ${'ABCDEFGHIJKLMNOP'[cue.hot_cue_index]}`
-                          : 'Memory cue')
-                      }
-                      onClick={() => seek(cue.position_ms / 1000)}
-                    />
-                  );
-                })}
-          </div>
-          <span className="player-time">{formatTime(duration)}</span>
-        </div>
+        <span className="player-time">{formatTime(duration)}</span>
       </div>
 
       {/* Right: volume + device picker + history + navigate to playlist */}
